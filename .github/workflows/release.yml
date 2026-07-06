@@ -1,9 +1,11 @@
-name: Release
+name: Publish Release
 
 on:
   push:
     tags:
       - 'v*'
+
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build web app
         uses: ./.github/actions/build-web
@@ -32,7 +34,7 @@ jobs:
           (cd dist-release && zip -r "zmakebas-plus-web-${tag}.zip" "zmakebas-plus-web-${tag}")
 
       - name: Upload web app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zmakebas-plus-web
           path: |
@@ -46,10 +48,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -86,7 +88,7 @@ jobs:
           (cd dist-release && zip -r "zmakebas-plus-cli-${tag}.zip" "zmakebas-plus-cli-${tag}")
 
       - name: Upload CLI bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zmakebas-plus-cli
           path: |
@@ -116,10 +118,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 26
           cache: npm
@@ -167,7 +169,7 @@ jobs:
           fi
 
       - name: Upload executable artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.archive }}
           path: |
@@ -185,7 +187,7 @@ jobs:
 
     steps:
       - name: Download release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: release-assets
           merge-multiple: true
@@ -194,6 +196,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
