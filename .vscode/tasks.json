@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: build",
+      "type": "npm",
+      "script": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$tsc",
+      "detail": "Build the Vite app with TypeScript checks."
+    },
+    {
+      "label": "npm: dev",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "$^"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local:.*http://localhost:[0-9]+"
+        }
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      },
+      "detail": "Start the Vite development server."
+    },
+    {
+      "label": "export",
+      "type": "shell",
+      "command": "python",
+      "args": ["export.py"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": "$python"
+    }
+  ]
+}

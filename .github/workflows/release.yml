@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    name: Build web app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build web app
+        uses: ./.github/actions/build-web
+
+      - name: Package web app
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          package_dir="dist-release/zmakebas-plus-web-${tag}"
+          mkdir -p "${package_dir}"
+          cp -R dist-web/. "${package_dir}/"
+          tar -czf "dist-release/zmakebas-plus-web-${tag}.tar.gz" -C dist-release "zmakebas-plus-web-${tag}"
+          (cd dist-release && zip -r "zmakebas-plus-web-${tag}.zip" "zmakebas-plus-web-${tag}")
+
+      - name: Upload web app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zmakebas-plus-web
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.zip
+          if-no-files-found: error
+
+  build-cli:
+    name: Build CLI bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set release version
+        shell: bash
+        run: echo "ZMAKEBAS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build CLI bundle
+        run: npm run build:cli
+
+      - name: Smoke test CLI bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node ./dist-cli/zmakebas.js --version)" = "${GITHUB_REF_NAME#v}"
+          node ./dist-cli/zmakebas.js -h
+          printf '10 PRINT "HELLO"\n' | node ./dist-cli/zmakebas.js -o smoke.tap
+          test -s smoke.tap
+
+      - name: Package CLI bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          package_dir="dist-release/zmakebas-plus-cli-${tag}"
+          mkdir -p "${package_dir}"
+          cp dist-cli/zmakebas.js dist-cli/zmakebas.js.map "${package_dir}/"
+          chmod +x "${package_dir}/zmakebas.js"
+          tar -czf "dist-release/zmakebas-plus-cli-${tag}.tar.gz" -C dist-release "zmakebas-plus-cli-${tag}"
+          (cd dist-release && zip -r "zmakebas-plus-cli-${tag}.zip" "zmakebas-plus-cli-${tag}")
+
+      - name: Upload CLI bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zmakebas-plus-cli
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.zip
+          if-no-files-found: error
+
+  build-executables:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            archive: zmakebas-plus-linux-x64
+            executable: zmakebas
+          - os: macos-latest
+            target: macos-arm64
+            archive: zmakebas-plus-macos-arm64
+            executable: zmakebas
+          - os: windows-latest
+            target: windows-x64
+            archive: zmakebas-plus-windows-x64
+            executable: zmakebas.exe
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set release version
+        shell: bash
+        run: echo "ZMAKEBAS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build standalone executable
+        run: npm run build:exe
+
+      - name: Smoke test executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${GITHUB_REF_NAME#v}"
+            "./dist-exe/${{ matrix.executable }}" -h
+            printf '10 PRINT "HELLO"\n' | "./dist-exe/${{ matrix.executable }}" -o smoke.tap
+          else
+            chmod +x "./dist-exe/${{ matrix.executable }}"
+            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${GITHUB_REF_NAME#v}"
+            "./dist-exe/${{ matrix.executable }}" -h
+            printf '10 PRINT "HELLO"\n' | "./dist-exe/${{ matrix.executable }}" -o smoke.tap
+          fi
+          test -s smoke.tap
+
+      - name: Package executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          package_dir="dist-release/${{ matrix.archive }}-${tag}"
+          mkdir -p "${package_dir}"
+          cp "dist-exe/${{ matrix.executable }}" "${package_dir}/"
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            chmod +x "${package_dir}/${{ matrix.executable }}"
+          fi
+          tar -czf "dist-release/${{ matrix.archive }}-${tag}.tar.gz" -C dist-release "${{ matrix.archive }}-${tag}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            (cd dist-release && 7z a "${{ matrix.archive }}-${tag}.zip" "${{ matrix.archive }}-${tag}")
+          fi
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - build-web
+      - build-cli
+      - build-executables
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" release-assets/* --clobber
+          else
+            gh release create "${tag}" release-assets/* --title "${tag}" --notes "Release ${tag}"
+          fi
