@@ -1,6 +1,6 @@
 # zmakebas+
 
-A browser-based ZX BASIC editor, validator, and program-file exporter.
+A browser-based ZX BASIC editor, validator, and program-file exporter. [Try it out now](https://timex-sinclair-projects.github.io/zmakebas-plus/).
 
 This project is inspired by [zmakebas](https://github.com/ohnosec/zmakebas), the command-line tool that converts text BASIC listings into Spectrum, Timex/Sinclair, or ZX81 program files. zmakebas is primarily a tokenizer and exporter, so it can produce output for BASIC listings that still contain structural errors. zmakebas+ validates the program before export, so those errors can be caught earlier.
 
