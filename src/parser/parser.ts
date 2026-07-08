@@ -52,6 +52,7 @@ import {
   type BasicExtension,
 } from './dialects'
 import { ZxBasicSyntaxError } from './errors'
+import { describeToken, tokenKindDisplayName } from './tokenText'
 import {
   expressionStarters,
   nonVariableExpressionStarters,
@@ -425,7 +426,7 @@ export class Parser {
       }
 
       if (!this.isStatementSupported(this.current().kind)) {
-        throw this.error(`${this.current().kind} is not supported by the ${this.dialectLabel()} dialect.`, 'statement')
+        throw this.error(`${tokenKindDisplayName(this.current().kind)} is not supported by the ${this.dialectLabel()} dialect.`, 'statement')
       }
 
       statements.push(this.parseStatement())
@@ -1225,7 +1226,7 @@ export class Parser {
         items.push(this.parseSpectranetExpression('numeric'))
         break
       default:
-        throw this.error(`Unsupported Spectranet statement ${command.kind}.`, 'Spectranet statement')
+        throw this.error(`Unsupported Spectranet statement ${tokenKindDisplayName(command.kind)}.`, 'Spectranet statement')
     }
 
     return {
@@ -1373,7 +1374,7 @@ export class Parser {
     }
 
     if (this.isUnsupportedExpressionKeyword(this.current().kind)) {
-      throw this.error(`${this.current().kind} is not supported by the ${this.dialectLabel()} dialect.`, 'expression')
+      throw this.error(`${tokenKindDisplayName(this.current().kind)} is not supported by the ${this.dialectLabel()} dialect.`, 'expression')
     }
 
     if (this.at('NUMLIT')) {
@@ -1863,7 +1864,7 @@ export class Parser {
 
   private expectVariableName(): Token {
     if (!this.isVariableNameStart(this.current().kind)) {
-      throw this.error(`Expected VARNAME but found ${this.describeCurrent()}.`, ['VARNAME'])
+      throw this.error(`Expected ${tokenKindDisplayName('VARNAME')} but found ${this.describeCurrent()}.`, ['VARNAME'])
     }
 
     return this.advance()
@@ -1957,7 +1958,7 @@ export class Parser {
 
   private expect(kind: TokenKind): Token {
     if (!this.at(kind)) {
-      throw this.error(`Expected ${kind} but found ${this.describeCurrent()}.`, [kind])
+      throw this.error(`Expected ${tokenKindDisplayName(kind)} but found ${this.describeCurrent()}.`, [kind])
     }
     return this.advance()
   }
@@ -1991,8 +1992,7 @@ export class Parser {
   }
 
   private describeCurrent(): string {
-    const token = this.current()
-    return token.lexeme ? `${token.kind} "${token.lexeme}"` : token.kind
+    return describeToken(this.current())
   }
 
   private error(message: string, expected?: readonly TokenKind[] | string): ZxBasicSyntaxError {
