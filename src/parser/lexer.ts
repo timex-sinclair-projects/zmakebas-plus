@@ -11,6 +11,7 @@ import {
   type BasicExtension,
 } from './dialects'
 import { parseSpectrumDisplayControlEscape } from './exportCommon'
+import { basicKeywordAliases } from './keywordAliases'
 import { lexerSimpleTokenText } from './tokenText'
 import type { SourcePosition, SourceSpan, Token, TokenKind } from './tokens'
 
@@ -55,6 +56,7 @@ const keywordSpecs = ([
   { text: '%CONTROL', kind: 'SN_CONTROL' },
   { text: '%IFCONFIG', kind: 'SN_IFCONFIG' },
   { text: '%FSCONFIG', kind: 'SN_FSCONFIG' },
+  ...basicKeywordAliases,
   ...keywordSpecsFromBasicTokens([...spectrumTokenDefinitions, ...ts2068ExtensionTokenDefinitions, ...zx81TokenDefinitions]),
   { text: 'ONERR', kind: 'ONERR' },
   { text: 'OPEN#', kind: 'OPEN' },

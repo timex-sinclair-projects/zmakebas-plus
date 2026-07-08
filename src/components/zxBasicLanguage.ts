@@ -6,6 +6,7 @@ import { tags } from '@lezer/highlight'
 import { lex, type BasicDialect, type BasicExtension, type Token, type TokenKind } from '../parser'
 import { spectrumTokenDefinitions, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition, zx81TokenDefinitions } from '../parser/basicTokens'
 import { isSpectranetEnabled, spectranetStatementKinds, ts2068OnlyExpressionKeywordKinds, ts2068OnlyKeywordKinds, zx81OnlyStatementKinds } from '../parser/dialects'
+import { basicKeywordAliases } from '../parser/keywordAliases'
 import { expressionStarters, statementStarters } from '../parser/tokens'
 
 type KeywordSpec = {
@@ -58,6 +59,7 @@ const keywordSpecs = (
     { text: '%CONTROL', kind: 'SN_CONTROL' },
     { text: '%IFCONFIG', kind: 'SN_IFCONFIG' },
     { text: '%FSCONFIG', kind: 'SN_FSCONFIG' },
+    ...basicKeywordAliases,
     ...keywordSpecsFromBasicTokens([...spectrumTokenDefinitions, ...ts2068ExtensionTokenDefinitions, ...zx81TokenDefinitions]),
     { text: 'ONERR', kind: 'ONERR' },
     { text: 'OPEN#', kind: 'OPEN' },
