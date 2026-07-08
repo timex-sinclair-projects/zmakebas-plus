@@ -1,18 +1,18 @@
 # zmakebas+
 
-A browser-based ZX BASIC editor, validator, and program-file exporter. [Try it out now](https://timex-sinclair-projects.github.io/zmakebas-plus/).
+A browser-based [Sinclair BASIC](https://en.wikipedia.org/wiki/Sinclair_BASIC) editor, validator, and program-file exporter. [Try it out now](https://timex-sinclair-projects.github.io/zmakebas-plus/).
 
-This project is inspired by [zmakebas](https://github.com/ohnosec/zmakebas), the command-line tool that converts text BASIC listings into Spectrum, Timex/Sinclair, or ZX81 program files. zmakebas is primarily a tokenizer and exporter, so it can produce output for BASIC listings that still contain structural errors. zmakebas+ validates the program before export, so those errors can be caught earlier.
+This project is inspired by [zmakebas](https://github.com/ohnosec/zmakebas), the command-line tool that converts Sinclair BASIC text files into Spectrum, Timex/Sinclair, or ZX81 program files. zmakebas is primarily a tokenizer and exporter, so it can produce output for BASIC text files that still contain structural errors. zmakebas+ validates the program before export, so those errors can be caught earlier.
 
 ## What It Does
 
 - Validates BASIC as you edit and highlights syntax errors.
 - Supports numbered BASIC listings and label mode.
 - Shows the generated BASIC listing for label-mode programs.
-- Exports ZX Spectrum/Timex TAP files, ZX Spectrum +3DOS files, and ZX81 P files from the browser.
+- Exports Spectrum-family TAP files, ZX Spectrum +3DOS files, and ZX81 P files from the browser.
 - Includes a zmakebas compatible command line tool.
 - Imports Spectrum-family TAP files and ZX81 P files.
-- Runs fully client-side; no server is needed after the static files are built.
+- Runs fully client-side, no backend service is required.
 
 ## Relationship To zmakebas
 
@@ -25,7 +25,7 @@ The input format broadly follows the zmakebas README:
 - A trailing backslash continues a physical input line onto the next line.
 - `RAND`/`RANDOMIZE` style aliases are accepted where supported by the lexer.
 - Keyword-looking variables are allowed in variable contexts where validation can distinguish them, such as `LET at=0`.
-- UDG escapes `\A` through `\U`, block graphics, copyright `\*`, raw byte, literal `@`, and literal backslash escape forms are supported in exported strings and REM text. Imported Spectrum-family TAP strings and REM text use `\*` for byte `127` and readable block-graphic backslash forms for bytes `128` through `143`, except for block forms ending in a space at the end of REM text where numeric escapes preserve the stored byte. UDG bytes stay as numeric raw-byte escapes so the stored character codes remain visible.
+- UDG escapes `\A` through `\U`, block graphics, copyright `\*`, raw byte, literal `@`, and literal backslash escape forms are supported in exported strings and REM text. Imported Spectrum-family TAP strings and REM text use `\*` for © (copyright), and readable block-graphic backslash forms for bytes `128` through `143`, except for block forms ending in a space at the end of REM text where numeric escapes preserve the stored byte. UDG bytes stay as numeric raw-byte escapes so the stored character codes remain visible.
 - Spectrum-family display-control escapes are available as readable raw-byte aliases: `\{INK n}` and `\{PAPER n}` use `0..9`; `\{FLASH n}`, `\{BRIGHT n}`, `\{INVERSE n}`, and `\{OVER n}` use `0..1`. These can be used anywhere raw byte escapes can be used, including strings and REM text.
 - In ZX81 mode, lowercase letters in the program text follow zmakebas compatibility and export as inverse `A-Z`. Use uppercase text for normal ZX81 letters. Imported ZX81 P files use backslash forms for inverse letters, inverse digits, inverse punctuation, and block graphics where that is roundtrip-safe.
 
@@ -57,10 +57,10 @@ With the default start line `10` and increment `2`, this generates:
 14 PRINT "hello world"
 ```
 
-You can set the generated start line and increment from the toolbar. You can also pin a generated line number in the listing:
+You can set the generated start line and increment from the toolbar. You can also pin a generated line number in the listing. Here the line number starts at 9000 and increments by 2:
 
 ```basic
-9000 DATA "Blah"
+9000+2 DATA "Blah"
 DATA "Foo"
 DATA "Bat"
 ```
@@ -94,7 +94,7 @@ On Windows, the executable is `zmakebas.exe`:
 .\zmakebas.exe -o hello.tap hello.bas
 ```
 
-By default, input is read from stdin and output is written to `out.tap`. Non-ZX81 mode accepts ZX Spectrum, Spectranet, and TS2068 syntax for compatibility with the extended original `zmakebas` token set. Use `-p` for ZX81 `.p` output, `-l` for label mode, `-r` for raw headerless Spectrum BASIC output, and `-3` for +3DOS output. The command line uses the same stricter validation as the web app, so invalid syntax that original `zmakebas` tokenized loosely may be rejected.
+By default, input is read from stdin and output is written to `out.tap`. Non-ZX81 mode accepts ZX Spectrum, Spectranet, and TS2068 syntax for compatibility with the original `zmakebas` token set. Use `-p` for ZX81 `.p` output, `-l` for label mode, `-r` for raw headerless Spectrum BASIC output, and `-3` for +3DOS output. The command line uses the same stricter validation as the web app, so invalid syntax that original `zmakebas` tokenized loosely may be rejected.
 
 The release also includes a Node CLI bundle. Use that if you prefer to run the JavaScript CLI directly or need a platform-neutral download. It requires [Node.js](https://nodejs.org/en/download):
 
@@ -151,13 +151,13 @@ On Windows, the local executable path is `dist-exe\zmakebas.exe`:
 .\dist-exe\zmakebas.exe -o hello.tap hello.bas
 ```
 
-Local executable builds use Node single executable applications and require Node.js 26 or newer.
+Local executable builds use Node single executable applications that requires Node.js 26 or newer.
 
 ## Project Layout
 
 - `src/parser` contains the lexer, parser, label preprocessor, and program-file exporters.
-- `src/cli` contains the Node CLI source; `vite.cli.config.ts` builds it to `dist-cli/zmakebas.js`.
+- `src/cli` contains the Node CLI source.
 - `src/components` contains the React UI components.
 - `src/hooks` contains the app-level parser, file, and busy-indicator hooks.
 - `build-exe.mjs` packages the built CLI as a standalone Node single executable.
-- `docs` contains reference notes for BASIC dialect and extension syntax that is not yet fully implemented.
+
