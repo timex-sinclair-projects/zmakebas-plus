@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import Button from 'react-bootstrap/Button'
 import Dropdown from 'react-bootstrap/Dropdown'
 import Form from 'react-bootstrap/Form'
-import { BsCheckAll, BsClipboard, BsClipboardPlus, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
+import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
 import type { BasicDialect, BasicExtension } from '../parser'
 import { GoToLineControl } from './GoToLineControl'
 import { SourceCodeEditor, type SourceCodeEditorHandle } from './SourceCodeEditor'
@@ -24,6 +25,7 @@ type SourcePanelProps = {
   readonly onSourceDraftChange: (source: string) => void
   readonly onSourceChange: (source: string) => void
   readonly onCursorChange: (position: SourceCursorPosition) => void
+  readonly onGotoError: () => void
   readonly onGotoLine: (lineNumber: number) => void
 }
 
@@ -40,6 +42,7 @@ export function SourcePanel({
   onSourceDraftChange,
   onSourceChange,
   onCursorChange,
+  onGotoError,
   onGotoLine,
 }: SourcePanelProps) {
   const editorRef = useRef<SourceCodeEditorHandle | null>(null)
@@ -50,6 +53,7 @@ export function SourcePanel({
   const [editorFontSize, setEditorFontSize] = useState(defaultEditorFontSize)
   const canZoomOut = editorFontSize > minEditorFontSize
   const canZoomIn = editorFontSize < maxEditorFontSize
+  const canGotoError = diagnostic !== null
 
   useEffect(() => {
     if (source === sourcePropRef.current) {
@@ -146,9 +150,15 @@ export function SourcePanel({
     <section className="tool-panel source-panel">
       <div className="source-panel-header">
         <Form.Label htmlFor="basic-source" className="source-title">
-          BASIC code
+          BASIC listing
         </Form.Label>
         <div className="source-toolbar">
+          {canGotoError && (
+            <Button type="button" variant="outline-danger" size="sm" className="source-goto-error-button me-2" onClick={onGotoError}>
+              <BsBullseye aria-hidden="true" />
+              Go to error
+            </Button>
+          )}
           <GoToLineControl className="goto-line-control" id="goto-line" value={gotoLine} onChange={setGotoLine} onSubmit={handleGoto} />
           <Dropdown align="end" className="editor-actions-menu">
             <Dropdown.Toggle variant="outline-secondary" size="sm" className="source-icon-button" aria-label="Editor actions" title="Editor actions">
@@ -182,7 +192,7 @@ export function SourcePanel({
       </div>
       <SourceCodeEditor
         ref={editorRef}
-        ariaLabel="BASIC code"
+        ariaLabel="BASIC listing"
         dialect={dialect}
         extensions={extensions}
         diagnostic={draftSource === source ? diagnostic : null}

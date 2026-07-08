@@ -1,6 +1,6 @@
-import Button from 'react-bootstrap/Button'
-import { BsBullseye, BsCheckCircleFill, BsExclamationTriangleFill } from 'react-icons/bs'
+import { BsCheckCircleFill, BsExclamationTriangleFill } from 'react-icons/bs'
 import type { BasicDialect, StatementNode } from '../parser'
+import { programFileFormatName, type SpectrumExportFormat } from '../services/programFile'
 import { zmakebasVersion } from '../version'
 import type { ParseState, SourceCursorPosition } from './types'
 
@@ -9,21 +9,21 @@ type ParserStatusAlertProps = {
   readonly dialect: BasicDialect
   readonly isSourceUnvalidated: boolean
   readonly parseState: ParseState
-  readonly onGotoError: () => void
+  readonly spectrumExportFormat: SpectrumExportFormat
 }
 
-export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated, parseState, onGotoError }: ParserStatusAlertProps) {
+export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated, parseState, spectrumExportFormat }: ParserStatusAlertProps) {
   if (isSourceUnvalidated) {
     return (
       <footer className="status-bar status-warning">
         <div className="status-message">
           <BsExclamationTriangleFill aria-hidden="true" />
           <span>The source has changed and has not been validated yet.</span>
-          <span className="status-cursor">
-            Ln {cursorPosition.line}, Col {cursorPosition.column}
-          </span>
         </div>
         <div className="status-actions">
+          <span className="status-count status-cursor">
+            Ln {cursorPosition.line}, Col {cursorPosition.column}
+          </span>
           <span className="status-count">v{zmakebasVersion}</span>
         </div>
       </footer>
@@ -33,20 +33,16 @@ export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated
   if (parseState.ok) {
     const lineCount = parseState.ast.lines.length
     const statementCount = countStatements(parseState.ast.lines.flatMap((line) => line.statements))
-    const downloadFormatLabel = dialect === 'zx81' ? 'P file' : 'TAP file'
+    const downloadFormatLabel = `${programFileFormatName(dialect, spectrumExportFormat)} file`
 
     return (
       <footer className="status-bar status-ok">
         <div className="status-message">
           <BsCheckCircleFill aria-hidden="true" />
-          <strong>Ready</strong>
-          <span>{downloadFormatLabel}</span>
-          <span className="status-cursor">
-            Ln {cursorPosition.line}, Col {cursorPosition.column}
-          </span>
+          <strong>Validated</strong>
+          <span>{downloadFormatLabel} is ready</span>
         </div>
         <div className="status-actions">
-          <span className="status-count">v{zmakebasVersion}</span>
           <span className="status-count">
             {lineCount} lines
           </span>
@@ -56,6 +52,10 @@ export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated
           <span className="status-count">
             {parseState.tokens.length} tokens
           </span>
+          <span className="status-count status-cursor">
+            Ln {cursorPosition.line}, Col {cursorPosition.column}
+          </span>
+          <span className="status-count">v{zmakebasVersion}</span>
         </div>
       </footer>
     )
@@ -68,12 +68,8 @@ export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated
       <div className="status-message">
         <BsExclamationTriangleFill aria-hidden="true" />
         <span>{parseState.message}</span>
-        <span className="status-cursor">
-          Ln {cursorPosition.line}, Col {cursorPosition.column}
-        </span>
       </div>
       <div className="status-actions">
-        <span className="status-count">v{zmakebasVersion}</span>
         <span className="status-count status-error-label">
           {parseState.title}
         </span>
@@ -82,12 +78,10 @@ export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated
             Line {parseState.line}, Column {parseState.column}
           </span>
         )}
-        {canGotoError && (
-          <Button type="button" variant="outline-danger" size="sm" onClick={onGotoError}>
-            <BsBullseye aria-hidden="true" />
-            Go to error
-          </Button>
-        )}
+        <span className="status-count status-cursor">
+          Ln {cursorPosition.line}, Col {cursorPosition.column}
+        </span>
+        <span className="status-count">v{zmakebasVersion}</span>
       </div>
     </footer>
   )

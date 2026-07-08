@@ -32,7 +32,7 @@ export function ParserHeader({
   onDownloadProgram,
 }: ParserHeaderProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
-  const exportLabel = `Export ${programFileFormatName(dialect, spectrumExportFormat)}`
+  const exportLabel = `${programFileFormatName(dialect, spectrumExportFormat)} file`
 
   function handleUploadChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.currentTarget.files?.[0]

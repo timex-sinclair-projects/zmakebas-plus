@@ -185,22 +185,24 @@ export function ParserOptionsPane({
               Validate
             </Button>
           ) : null}
-          <ButtonGroup className="view-mode-control" aria-label="Workspace view">
-            <Button type="button" variant={diagnosticsOpen ? 'outline-secondary' : 'secondary'} aria-pressed={!diagnosticsOpen} onClick={() => onDiagnosticsOpenChange(false)}>
-              Editor
-            </Button>
-            <Button
-              type="button"
-              variant={diagnosticsOpen ? 'secondary' : 'outline-secondary'}
-              aria-pressed={diagnosticsOpen}
-              disabled={!canShowDiagnostics}
-              title={canShowDiagnostics ? undefined : 'Diagnostics are available after successful validation.'}
-              onClick={() => onDiagnosticsOpenChange(true)}
-            >
-              Diagnostics
-            </Button>
-          </ButtonGroup>
         </section>
+      </div>
+      <div className="options-pane-footer">
+        <ButtonGroup className="view-mode-control" aria-label="Workspace view">
+          <Button type="button" variant={diagnosticsOpen ? 'outline-secondary' : 'secondary'} aria-pressed={!diagnosticsOpen} onClick={() => onDiagnosticsOpenChange(false)}>
+            Editor
+          </Button>
+          <Button
+            type="button"
+            variant={diagnosticsOpen ? 'secondary' : 'outline-secondary'}
+            aria-pressed={diagnosticsOpen}
+            disabled={!canShowDiagnostics}
+            title={canShowDiagnostics ? undefined : 'Diagnostics are available after successful validation.'}
+            onClick={() => onDiagnosticsOpenChange(true)}
+          >
+            Diagnostics
+          </Button>
+        </ButtonGroup>
       </div>
     </aside>
   )

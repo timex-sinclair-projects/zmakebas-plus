@@ -196,6 +196,13 @@
     padding: 12px;
   }
 
+  .options-pane-footer {
+    flex: 0 0 auto;
+    margin-top: auto;
+    background: var(--panel);
+    padding: 0;
+  }
+
   .option-group {
     display: grid;
     gap: 10px;
@@ -276,10 +283,21 @@
     .btn {
       display: flex;
       justify-content: center;
-      min-height: 34px;
+      min-height: 38px;
+      border-color: var(--line);
+      border-width: 1px 0 0;
       border-radius: 0;
       font-size: 14px;
       font-weight: 700;
+    }
+
+    .btn:first-child {
+      border-right-width: 1px;
+      border-bottom-left-radius: 7px;
+    }
+
+    .btn:last-child {
+      border-bottom-right-radius: 7px;
     }
   }
 
@@ -679,6 +697,7 @@
   .source-toolbar {
     display: inline-flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 8px;
     min-width: 0;
   }
@@ -697,6 +716,29 @@
     padding: 0;
     color: var(--focus);
     border-color: var(--line);
+  }
+
+  .source-goto-error-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    color: var(--bs-danger);
+    border-color: var(--bs-danger);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: nowrap;
+
+    &:hover,
+    &:focus-visible,
+    &:active {
+      background: rgba(var(--bs-danger-rgb), 0.08);
+      color: var(--bs-danger);
+      border-color: var(--bs-danger);
+    }
   }
 
   .editor-actions-menu {
@@ -742,6 +784,7 @@
     display: grid;
     grid-template-columns: auto minmax(108px, 140px);
     align-items: center;
+    flex: 0 0 auto;
     gap: 8px;
     min-width: 0;
 
@@ -1026,11 +1069,6 @@
       grid-template-columns: auto minmax(108px, 1fr);
       flex: 1 1 auto;
     }
-
-    .source-code-editor {
-      height: 420px;
-      min-height: 420px;
-    }
   }
 }
 
@@ -1070,10 +1108,6 @@
     }
   }
 
-  .status-cursor {
-    color: var(--muted);
-  }
-
   .status-actions {
     display: inline-flex;
     flex: 0 0 auto;
@@ -1086,6 +1120,10 @@
     color: var(--muted);
     font-weight: 700;
     white-space: nowrap;
+  }
+
+  .status-count.status-cursor {
+    font-weight: 400;
   }
 
   .status-warning-label {

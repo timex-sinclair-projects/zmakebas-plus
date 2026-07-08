@@ -405,6 +405,7 @@ function App() {
                 }}
                 onSourceChange={handleSourceChange}
                 onCursorChange={setCursorPosition}
+                onGotoError={handleGotoError}
                 onGotoLine={handleSourceGotoLine}
               />
             )}
@@ -416,7 +417,7 @@ function App() {
         dialect={dialect}
         isSourceUnvalidated={!automaticParsingEnabled && hasUnparsedDraft}
         parseState={parseState}
-        onGotoError={handleGotoError}
+        spectrumExportFormat={spectrumExportFormat}
       />
     </main>
   )
