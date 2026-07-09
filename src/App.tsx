@@ -16,6 +16,7 @@ import { usePreference } from './hooks/usePreference'
 import { useProgramFiles } from './hooks/useProgramFiles'
 import { useZxBasicParser } from './hooks/useZxBasicParser'
 import type { BasicDialect, BasicExtension, LabelSourceMap } from './parser'
+import { formatBasicSource } from './services/formatBasicSource'
 import { sampleProgram } from './services/sampleProgram'
 
 function App() {
@@ -57,6 +58,7 @@ function App() {
   const [screenWrapHintsEnabled, setScreenWrapHintsEnabled] = usePreference('screenWrapHintsEnabled')
   const [screenWidth, setScreenWidth] = usePreference('screenWidth')
   const [spectrumExportFormat, setSpectrumExportFormat] = usePreference('spectrumExportFormat')
+  const [formatterKeywordCase, setFormatterKeywordCase] = usePreference('formatterKeywordCase')
   const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
@@ -154,6 +156,15 @@ function App() {
 
   function handleRefreshParse(nextSource = source): void {
     commitSource(nextSource, {
+      requestParseAfterCommit: true,
+      startProcessingBeforeCommit: true,
+    })
+  }
+
+  function handleFormatSource(): void {
+    const formattedSource = formatBasicSource(sourceDraftRef.current, { dialect, extensions, keywordCase: formatterKeywordCase })
+    commitSource(formattedSource, {
+      clearNavigationAfterCommit: true,
       requestParseAfterCommit: true,
       startProcessingBeforeCommit: true,
     })
@@ -355,6 +366,7 @@ function App() {
                   canShowDiagnostics={parseState.ok}
                   dialect={dialect}
                   diagnosticsOpen={diagnosticsVisible}
+                  formatterKeywordCase={formatterKeywordCase}
                   labelIncrement={labelIncrement}
                   labelModeEnabled={labelModeEnabled}
                   labelStartLine={labelStartLine}
@@ -365,6 +377,7 @@ function App() {
                   onAutomaticParsingEnabledChange={handleAutomaticParsingEnabledChange}
                   onDiagnosticsOpenChange={handleShowResultsChange}
                   onDialectChange={handleDialectChange}
+                  onFormatterKeywordCaseChange={setFormatterKeywordCase}
                   onLabelIncrementChange={handleLabelIncrementChange}
                   onLabelModeEnabledChange={handleLabelModeEnabledChange}
                   onLabelStartLineChange={handleLabelStartLineChange}
@@ -405,6 +418,7 @@ function App() {
                 }}
                 onSourceChange={handleSourceChange}
                 onCursorChange={setCursorPosition}
+                onFormatSource={handleFormatSource}
                 onGotoError={handleGotoError}
                 onGotoLine={handleSourceGotoLine}
               />

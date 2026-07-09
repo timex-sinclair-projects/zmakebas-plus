@@ -1,4 +1,5 @@
 import { defaultSpectrumExportFormat, type SpectrumExportFormat } from './programFile'
+import type { FormatKeywordCase } from './formatBasicSource'
 import { defaultDialect, type BasicDialect } from '../parser/dialects'
 
 const preferenceStorageKey = 'zmakebas.preferences'
@@ -10,6 +11,7 @@ export interface IPreferenceValues {
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
+  readonly formatterKeywordCase: FormatKeywordCase
   readonly optionsCollapsed: boolean
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
@@ -25,6 +27,7 @@ export const preferenceDefaults: IPreferenceValues = {
   labelIncrement: 2,
   labelModeEnabled: true,
   labelStartLine: 10,
+  formatterKeywordCase: 'upper',
   optionsCollapsed: false,
   screenWidth: 32,
   screenWrapHintsEnabled: true,
@@ -49,6 +52,7 @@ export function loadPreferences(): IPreferenceValues {
     labelIncrement: readIntegerPreference(storedPreferences.labelIncrement, preferenceDefaults.labelIncrement, 1, 1000),
     labelModeEnabled: readBooleanPreference(storedPreferences.labelModeEnabled, preferenceDefaults.labelModeEnabled),
     labelStartLine: readIntegerPreference(storedPreferences.labelStartLine, preferenceDefaults.labelStartLine, 0, 9999),
+    formatterKeywordCase: readFormatterKeywordCasePreference(storedPreferences.formatterKeywordCase, preferenceDefaults.formatterKeywordCase),
     optionsCollapsed: readBooleanPreference(storedPreferences.optionsCollapsed, preferenceDefaults.optionsCollapsed),
     screenWidth: readIntegerPreference(storedPreferences.screenWidth, preferenceDefaults.screenWidth, 1, 256),
     screenWrapHintsEnabled: readBooleanPreference(storedPreferences.screenWrapHintsEnabled, preferenceDefaults.screenWrapHintsEnabled),
@@ -133,6 +137,10 @@ function readIntegerPreference(value: unknown, defaultValue: number, min: number
 
 function readDialectPreference(value: unknown, defaultValue: BasicDialect): BasicDialect {
   return value === 'spectrum' || value === 'ts2068' || value === 'zx81' ? value : defaultValue
+}
+
+function readFormatterKeywordCasePreference(value: unknown, defaultValue: FormatKeywordCase): FormatKeywordCase {
+  return value === 'upper' || value === 'lower' ? value : defaultValue
 }
 
 function readSpectrumExportFormatPreference(value: unknown, defaultValue: SpectrumExportFormat): SpectrumExportFormat {

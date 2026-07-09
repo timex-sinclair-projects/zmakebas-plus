@@ -2,6 +2,7 @@ import ButtonGroup from 'react-bootstrap/ButtonGroup'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import { BsArrowClockwise } from 'react-icons/bs'
+import type { FormatKeywordCase } from '../services/formatBasicSource'
 import type { SpectrumExportFormat } from '../services/programFile'
 import type { BasicDialect } from '../parser'
 import { NumberStepper } from './NumberStepper'
@@ -19,12 +20,17 @@ const spectrumExportFormatOptions: readonly RadioSelectionOption<SpectrumExportF
   { id: 'spectrum-export-tap', label: 'TAP', value: 'tap' },
   { id: 'spectrum-export-plus3dos', label: '+3DOS', value: 'plus3dos' },
 ]
+const formatterKeywordCaseOptions: readonly RadioSelectionOption<FormatKeywordCase>[] = [
+  { id: 'formatter-keyword-case-upper', label: 'UPPERCASE', value: 'upper' },
+  { id: 'formatter-keyword-case-lower', label: 'lowercase', value: 'lower' },
+]
 
 type ParserOptionsPaneProps = {
   readonly automaticParsingEnabled: boolean
   readonly canShowDiagnostics: boolean
   readonly dialect: BasicDialect
   readonly diagnosticsOpen: boolean
+  readonly formatterKeywordCase: FormatKeywordCase
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
@@ -35,6 +41,7 @@ type ParserOptionsPaneProps = {
   readonly onAutomaticParsingEnabledChange: (enabled: boolean) => void
   readonly onDiagnosticsOpenChange: (open: boolean) => void
   readonly onDialectChange: (dialect: BasicDialect) => void
+  readonly onFormatterKeywordCaseChange: (keywordCase: FormatKeywordCase) => void
   readonly onLabelIncrementChange: (increment: number) => void
   readonly onLabelModeEnabledChange: (enabled: boolean) => void
   readonly onLabelStartLineChange: (line: number) => void
@@ -50,6 +57,7 @@ export function ParserOptionsPane({
   canShowDiagnostics,
   dialect,
   diagnosticsOpen,
+  formatterKeywordCase,
   labelIncrement,
   labelModeEnabled,
   labelStartLine,
@@ -60,6 +68,7 @@ export function ParserOptionsPane({
   onAutomaticParsingEnabledChange,
   onDiagnosticsOpenChange,
   onDialectChange,
+  onFormatterKeywordCaseChange,
   onLabelIncrementChange,
   onLabelModeEnabledChange,
   onLabelStartLineChange,
@@ -142,6 +151,17 @@ export function ParserOptionsPane({
         </section>
 
         <section className="option-group">
+          <h3>Format</h3>
+          <RadioSelection
+            ariaLabel="Formatter keyword case"
+            name="formatter-keyword-case"
+            options={formatterKeywordCaseOptions}
+            value={formatterKeywordCase}
+            onChange={onFormatterKeywordCaseChange}
+          />
+        </section>
+
+        <section className="option-group">
           <h3>Display</h3>
           <Form.Check
             className="option-check"
@@ -180,7 +200,7 @@ export function ParserOptionsPane({
             onChange={(event) => onAutomaticParsingEnabledChange(event.currentTarget.checked)}
           />
           {!automaticParsingEnabled ? (
-            <Button type="button" variant="outline-secondary" className="validate-source-button" onClick={onValidate}>
+            <Button type="button" variant="outline-secondary" className="option-action-button" onClick={onValidate}>
               <BsArrowClockwise aria-hidden="true" />
               Validate
             </Button>

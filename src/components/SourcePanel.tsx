@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Button from 'react-bootstrap/Button'
 import Dropdown from 'react-bootstrap/Dropdown'
 import Form from 'react-bootstrap/Form'
-import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
+import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsTextLeft, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
 import type { BasicDialect, BasicExtension } from '../parser'
 import { GoToLineControl } from './GoToLineControl'
 import { SourceCodeEditor, type SourceCodeEditorHandle } from './SourceCodeEditor'
@@ -25,6 +25,7 @@ type SourcePanelProps = {
   readonly onSourceDraftChange: (source: string) => void
   readonly onSourceChange: (source: string) => void
   readonly onCursorChange: (position: SourceCursorPosition) => void
+  readonly onFormatSource: () => void
   readonly onGotoError: () => void
   readonly onGotoLine: (lineNumber: number) => void
 }
@@ -42,6 +43,7 @@ export function SourcePanel({
   onSourceDraftChange,
   onSourceChange,
   onCursorChange,
+  onFormatSource,
   onGotoError,
   onGotoLine,
 }: SourcePanelProps) {
@@ -167,15 +169,20 @@ export function SourcePanel({
             <Dropdown.Menu>
               <Dropdown.Item onClick={() => void handleCopySource()}>
                 <BsClipboard aria-hidden="true" />
-                Copy source
+                Copy
               </Dropdown.Item>
               <Dropdown.Item onClick={() => void handlePasteSource()}>
                 <BsClipboardPlus aria-hidden="true" />
-                Paste source
+                Paste
               </Dropdown.Item>
               <Dropdown.Item onClick={handleSelectAllSource}>
                 <BsCheckAll aria-hidden="true" />
                 Select all
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={onFormatSource}>
+                <BsTextLeft aria-hidden="true" />
+                Format
               </Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item disabled={!canZoomIn} onClick={handleZoomIn}>
