@@ -169,7 +169,7 @@ function byteToStringSource(byte: number): string {
     return '""'
   }
 
-  return byteToPlainSource(byte)
+  return byteToTextBodySource(byte)
 }
 
 function byteToRemSource(byte: number, isLastByte: boolean): string {
@@ -180,6 +180,15 @@ function byteToRemSource(byte: number, isLastByte: boolean): string {
   const blockGraphic = zx81BlockGraphicSources.get(byte)
   if (blockGraphic !== undefined && isLastByte && blockGraphic.endsWith(' ')) {
     return `\\{${byte}}`
+  }
+
+  return byteToTextBodySource(byte)
+}
+
+function byteToTextBodySource(byte: number): string {
+  const inverseLetter = byteToLowercaseInverseLetterSource(byte)
+  if (inverseLetter !== null) {
+    return inverseLetter
   }
 
   return byteToPlainSource(byte)
@@ -260,6 +269,10 @@ function byteToPlainSource(byte: number): string {
     default:
       return `\\{${byte}}`
   }
+}
+
+function byteToLowercaseInverseLetterSource(byte: number): string | null {
+  return byte >= 0xa6 && byte <= 0xbf ? String.fromCharCode('a'.charCodeAt(0) + byte - 0xa6) : null
 }
 
 function readWord(bytes: Uint8Array, offset: number): number {

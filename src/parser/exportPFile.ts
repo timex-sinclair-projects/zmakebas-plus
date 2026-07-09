@@ -69,11 +69,11 @@ function encodeToken(token: Token, isVariableToken: boolean): number[] {
   }
 
   if (token.kind === 'VARNAME' || isVariableToken) {
-    return encodeText(token.lexeme)
+    return encodeText(token.lexeme.toUpperCase())
   }
 
   if (token.kind === 'NUMLIT') {
-    return [...encodeText(token.lexeme), 0x7e, ...encodeNumber(Number(token.value))]
+    return [...encodeText(token.lexeme.toUpperCase()), 0x7e, ...encodeNumber(Number(token.value))]
   }
 
   if (token.kind === 'RAWBYTE') {
