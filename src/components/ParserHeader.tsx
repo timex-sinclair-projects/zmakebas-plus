@@ -33,6 +33,7 @@ export function ParserHeader({
 }: ParserHeaderProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const exportLabel = `${programFileFormatName(dialect, spectrumExportFormat)} file`
+  const uploadAccept = dialect === 'zx81' ? '.bas,.txt,.p,text/plain' : '.bas,.txt,.tap,text/plain'
 
   function handleUploadChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.currentTarget.files?.[0]
@@ -67,7 +68,7 @@ export function ParserHeader({
             <BsUpload aria-hidden="true" />
             Upload
           </Button>
-          <input ref={uploadInputRef} type="file" accept=".bas,.txt,.tap,.p,text/plain" className="visually-hidden" onChange={handleUploadChange} />
+          <input ref={uploadInputRef} type="file" accept={uploadAccept} className="visually-hidden" onChange={handleUploadChange} />
           <Button variant="outline-secondary" onClick={onSaveSource}>
             <BsDownload aria-hidden="true" />
             Download
