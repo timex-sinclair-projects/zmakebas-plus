@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import ButtonGroup from 'react-bootstrap/ButtonGroup'
 import Button from 'react-bootstrap/Button'
+import Collapse from 'react-bootstrap/Collapse'
 import Form from 'react-bootstrap/Form'
-import { BsArrowClockwise } from 'react-icons/bs'
+import { BsArrowClockwise, BsChevronDown } from 'react-icons/bs'
 import type { FormatKeywordCase } from '../services/formatBasicSource'
+import type { OptionsPaneSectionCollapsedStates, OptionsPaneSectionId } from '../services/preferences'
 import type { SpectrumExportFormat } from '../services/programFile'
 import type { BasicDialect } from '../parser'
 import { NumberStepper } from './NumberStepper'
@@ -34,6 +37,7 @@ type ParserOptionsPaneProps = {
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
+  readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
@@ -45,6 +49,7 @@ type ParserOptionsPaneProps = {
   readonly onLabelIncrementChange: (increment: number) => void
   readonly onLabelModeEnabledChange: (enabled: boolean) => void
   readonly onLabelStartLineChange: (line: number) => void
+  readonly onOptionsSectionCollapsedChange: (collapsedStates: OptionsPaneSectionCollapsedStates) => void
   readonly onScreenWidthChange: (width: number) => void
   readonly onScreenWrapHintsEnabledChange: (enabled: boolean) => void
   readonly onSpectranetEnabledChange: (enabled: boolean) => void
@@ -61,6 +66,7 @@ export function ParserOptionsPane({
   labelIncrement,
   labelModeEnabled,
   labelStartLine,
+  optionsSectionCollapsed,
   screenWidth,
   screenWrapHintsEnabled,
   spectranetEnabled,
@@ -72,12 +78,32 @@ export function ParserOptionsPane({
   onLabelIncrementChange,
   onLabelModeEnabledChange,
   onLabelStartLineChange,
+  onOptionsSectionCollapsedChange,
   onScreenWidthChange,
   onScreenWrapHintsEnabledChange,
   onSpectranetEnabledChange,
   onSpectrumExportFormatChange,
   onValidate,
 }: ParserOptionsPaneProps) {
+  function isSectionOpen(sectionId: OptionsPaneSectionId): boolean {
+    return !optionsSectionCollapsed[sectionId]
+  }
+
+  function toggleSection(sectionId: OptionsPaneSectionId): void {
+    onOptionsSectionCollapsedChange({
+      ...optionsSectionCollapsed,
+      [sectionId]: !optionsSectionCollapsed[sectionId],
+    })
+  }
+
+  function sectionProps(sectionId: OptionsPaneSectionId): Pick<CollapsibleOptionGroupProps, 'id' | 'open' | 'onToggle'> {
+    return {
+      id: `${sectionId}-options`,
+      open: isSectionOpen(sectionId),
+      onToggle: () => toggleSection(sectionId),
+    }
+  }
+
   return (
     <aside className="options-pane" aria-label="BASIC options">
       <div className="options-pane-header">
@@ -87,8 +113,7 @@ export function ParserOptionsPane({
         </div>
       </div>
       <div className="options-pane-body">
-        <section className="option-group">
-          <h3>Target</h3>
+        <CollapsibleOptionGroup title="Target" {...sectionProps('target')}>
           <RadioSelection ariaLabel="Target dialect" name="target-dialect" options={targetDialectOptions} value={dialect} onChange={onDialectChange} />
           <Form.Check
             className="option-check"
@@ -99,17 +124,15 @@ export function ParserOptionsPane({
             disabled={dialect !== 'spectrum'}
             onChange={(event) => onSpectranetEnabledChange(event.currentTarget.checked)}
           />
-        </section>
+        </CollapsibleOptionGroup>
 
         {dialect === 'spectrum' ? (
-          <section className="option-group">
-            <h3>Export</h3>
+          <CollapsibleOptionGroup title="Export" {...sectionProps('export')}>
             <RadioSelection ariaLabel="Spectrum export format" name="spectrum-export-format" options={spectrumExportFormatOptions} value={spectrumExportFormat} onChange={onSpectrumExportFormatChange} />
-          </section>
+          </CollapsibleOptionGroup>
         ) : null}
 
-        <section className="option-group">
-          <h3>Labels</h3>
+        <CollapsibleOptionGroup title="Labels" {...sectionProps('labels')}>
           <Form.Check
             className="option-check"
             type="checkbox"
@@ -148,10 +171,9 @@ export function ParserOptionsPane({
               onStepUp={() => commitNumberValue(String(labelIncrement + 1), 1, 1000, onLabelIncrementChange)}
             />
           </div>
-        </section>
+        </CollapsibleOptionGroup>
 
-        <section className="option-group">
-          <h3>Format</h3>
+        <CollapsibleOptionGroup title="Format" {...sectionProps('format')}>
           <RadioSelection
             ariaLabel="Formatter keyword case"
             name="formatter-keyword-case"
@@ -159,10 +181,9 @@ export function ParserOptionsPane({
             value={formatterKeywordCase}
             onChange={onFormatterKeywordCaseChange}
           />
-        </section>
+        </CollapsibleOptionGroup>
 
-        <section className="option-group">
-          <h3>Display</h3>
+        <CollapsibleOptionGroup title="Display" {...sectionProps('display')}>
           <Form.Check
             className="option-check"
             type="checkbox"
@@ -187,10 +208,9 @@ export function ParserOptionsPane({
               onStepUp={() => onScreenWidthChange(Math.min(maxScreenWidth, screenWidth + 1))}
             />
           </div>
-        </section>
+        </CollapsibleOptionGroup>
 
-        <section className="option-group">
-          <h3>Validation</h3>
+        <CollapsibleOptionGroup title="Validation" {...sectionProps('validation')}>
           <Form.Check
             className="option-check"
             type="checkbox"
@@ -205,7 +225,7 @@ export function ParserOptionsPane({
               Validate
             </Button>
           ) : null}
-        </section>
+        </CollapsibleOptionGroup>
       </div>
       <div className="options-pane-footer">
         <ButtonGroup className="view-mode-control" aria-label="Workspace view">
@@ -225,6 +245,38 @@ export function ParserOptionsPane({
         </ButtonGroup>
       </div>
     </aside>
+  )
+}
+
+type CollapsibleOptionGroupProps = {
+  readonly children: ReactNode
+  readonly id: string
+  readonly open: boolean
+  readonly title: string
+  readonly onToggle: () => void
+}
+
+function CollapsibleOptionGroup({
+  children,
+  id,
+  open,
+  title,
+  onToggle,
+}: CollapsibleOptionGroupProps) {
+  return (
+    <section className={`option-group${open ? ' is-open' : ''}`}>
+      <h3>
+        <button type="button" className="option-group-toggle" aria-controls={id} aria-expanded={open} onClick={onToggle}>
+          <span>{title}</span>
+          <BsChevronDown aria-hidden="true" />
+        </button>
+      </h3>
+      <Collapse in={open}>
+        <div id={id}>
+          <div className="option-group-content">{children}</div>
+        </div>
+      </Collapse>
+    </section>
   )
 }
 

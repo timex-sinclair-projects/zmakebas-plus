@@ -204,8 +204,6 @@
   }
 
   .option-group {
-    display: grid;
-    gap: 10px;
     border-bottom: 1px solid var(--line);
     padding: 0 0 14px;
     margin-bottom: 14px;
@@ -221,6 +219,45 @@
     color: var(--heading);
     font-size: 15px;
     font-weight: 800;
+  }
+
+  .option-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--focus);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    svg {
+      flex: 0 0 auto;
+      transition: transform 140ms ease;
+    }
+  }
+
+  .option-group:not(.is-open) .option-group-toggle svg {
+    transform: rotate(-90deg);
+  }
+
+  .option-group-content {
+    display: grid;
+    gap: 10px;
+    padding-top: 10px;
   }
 
   .radio-selection {

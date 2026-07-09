@@ -5,6 +5,9 @@ import { defaultDialect, type BasicDialect } from '../parser/dialects'
 const preferenceStorageKey = 'zmakebas.preferences'
 const preferenceVersion = 1
 
+export type OptionsPaneSectionId = 'target' | 'export' | 'labels' | 'format' | 'display' | 'validation'
+export type OptionsPaneSectionCollapsedStates = Record<OptionsPaneSectionId, boolean>
+
 export interface IPreferenceValues {
   readonly automaticParsingEnabled: boolean
   readonly dialect: BasicDialect
@@ -13,6 +16,7 @@ export interface IPreferenceValues {
   readonly labelStartLine: number
   readonly formatterKeywordCase: FormatKeywordCase
   readonly optionsCollapsed: boolean
+  readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
@@ -29,6 +33,14 @@ export const preferenceDefaults: IPreferenceValues = {
   labelStartLine: 10,
   formatterKeywordCase: 'upper',
   optionsCollapsed: false,
+  optionsSectionCollapsed: {
+    target: false,
+    export: false,
+    labels: true,
+    format: true,
+    display: true,
+    validation: true,
+  },
   screenWidth: 32,
   screenWrapHintsEnabled: true,
   spectranetEnabled: false,
@@ -54,6 +66,7 @@ export function loadPreferences(): IPreferenceValues {
     labelStartLine: readIntegerPreference(storedPreferences.labelStartLine, preferenceDefaults.labelStartLine, 0, 9999),
     formatterKeywordCase: readFormatterKeywordCasePreference(storedPreferences.formatterKeywordCase, preferenceDefaults.formatterKeywordCase),
     optionsCollapsed: readBooleanPreference(storedPreferences.optionsCollapsed, preferenceDefaults.optionsCollapsed),
+    optionsSectionCollapsed: readOptionsSectionCollapsedPreference(storedPreferences.optionsSectionCollapsed, preferenceDefaults.optionsSectionCollapsed),
     screenWidth: readIntegerPreference(storedPreferences.screenWidth, preferenceDefaults.screenWidth, 1, 256),
     screenWrapHintsEnabled: readBooleanPreference(storedPreferences.screenWrapHintsEnabled, preferenceDefaults.screenWrapHintsEnabled),
     spectranetEnabled: readBooleanPreference(storedPreferences.spectranetEnabled, preferenceDefaults.spectranetEnabled),
@@ -141,6 +154,21 @@ function readDialectPreference(value: unknown, defaultValue: BasicDialect): Basi
 
 function readFormatterKeywordCasePreference(value: unknown, defaultValue: FormatKeywordCase): FormatKeywordCase {
   return value === 'upper' || value === 'lower' ? value : defaultValue
+}
+
+function readOptionsSectionCollapsedPreference(value: unknown, defaultValue: OptionsPaneSectionCollapsedStates): OptionsPaneSectionCollapsedStates {
+  if (!isRecord(value)) {
+    return defaultValue
+  }
+
+  return {
+    target: readBooleanPreference(value.target, defaultValue.target),
+    export: readBooleanPreference(value.export, defaultValue.export),
+    labels: readBooleanPreference(value.labels, defaultValue.labels),
+    format: readBooleanPreference(value.format, defaultValue.format),
+    display: readBooleanPreference(value.display, defaultValue.display),
+    validation: readBooleanPreference(value.validation, defaultValue.validation),
+  }
 }
 
 function readSpectrumExportFormatPreference(value: unknown, defaultValue: SpectrumExportFormat): SpectrumExportFormat {

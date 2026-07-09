@@ -59,6 +59,7 @@ function App() {
   const [screenWidth, setScreenWidth] = usePreference('screenWidth')
   const [spectrumExportFormat, setSpectrumExportFormat] = usePreference('spectrumExportFormat')
   const [formatterKeywordCase, setFormatterKeywordCase] = usePreference('formatterKeywordCase')
+  const [optionsSectionCollapsed, setOptionsSectionCollapsed] = usePreference('optionsSectionCollapsed')
   const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
@@ -370,6 +371,7 @@ function App() {
                   labelIncrement={labelIncrement}
                   labelModeEnabled={labelModeEnabled}
                   labelStartLine={labelStartLine}
+                  optionsSectionCollapsed={optionsSectionCollapsed}
                   screenWidth={screenWidth}
                   screenWrapHintsEnabled={screenWrapHintsEnabled}
                   spectranetEnabled={spectranetEnabled}
@@ -381,6 +383,7 @@ function App() {
                   onLabelIncrementChange={handleLabelIncrementChange}
                   onLabelModeEnabledChange={handleLabelModeEnabledChange}
                   onLabelStartLineChange={handleLabelStartLineChange}
+                  onOptionsSectionCollapsedChange={setOptionsSectionCollapsed}
                   onScreenWidthChange={setScreenWidth}
                   onScreenWrapHintsEnabledChange={setScreenWrapHintsEnabled}
                   onSpectranetEnabledChange={handleSpectranetEnabledChange}
