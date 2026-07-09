@@ -25,8 +25,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Setup Pages
         uses: actions/configure-pages@v6
+
+      - name: Resolve version
+        uses: ./.github/actions/resolve-version
 
       - name: Build web app
         uses: ./.github/actions/build-web

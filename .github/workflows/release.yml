@@ -18,6 +18,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        uses: ./.github/actions/resolve-version
 
       - name: Build web app
         uses: ./.github/actions/build-web
@@ -26,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${RELEASE_TAG}"
           package_dir="dist-release/zmakebas-plus-web-${tag}"
           mkdir -p "${package_dir}"
           cp -R dist-web/. "${package_dir}/"
@@ -49,6 +54,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -59,9 +66,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set release version
-        shell: bash
-        run: echo "ZMAKEBAS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Resolve version
+        uses: ./.github/actions/resolve-version
 
       - name: Build CLI bundle
         run: npm run build:cli
@@ -70,7 +76,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(node ./dist-cli/zmakebas.js --version)" = "${GITHUB_REF_NAME#v}"
+          test "$(node ./dist-cli/zmakebas.js --version)" = "${ZMAKEBAS_VERSION}"
           node ./dist-cli/zmakebas.js -h
           printf '10 PRINT "HELLO"\n' | node ./dist-cli/zmakebas.js -o smoke.tap
           test -s smoke.tap
@@ -79,7 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${RELEASE_TAG}"
           package_dir="dist-release/zmakebas-plus-cli-${tag}"
           mkdir -p "${package_dir}"
           cp dist-cli/zmakebas.js dist-cli/zmakebas.js.map "${package_dir}/"
@@ -119,6 +125,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -129,9 +137,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set release version
-        shell: bash
-        run: echo "ZMAKEBAS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Resolve version
+        uses: ./.github/actions/resolve-version
 
       - name: Build standalone executable
         run: npm run build:exe
@@ -141,12 +148,12 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${GITHUB_REF_NAME#v}"
+            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${ZMAKEBAS_VERSION}"
             "./dist-exe/${{ matrix.executable }}" -h
             printf '10 PRINT "HELLO"\n' | "./dist-exe/${{ matrix.executable }}" -o smoke.tap
           else
             chmod +x "./dist-exe/${{ matrix.executable }}"
-            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${GITHUB_REF_NAME#v}"
+            test "$("./dist-exe/${{ matrix.executable }}" --version)" = "${ZMAKEBAS_VERSION}"
             "./dist-exe/${{ matrix.executable }}" -h
             printf '10 PRINT "HELLO"\n' | "./dist-exe/${{ matrix.executable }}" -o smoke.tap
           fi
@@ -156,7 +163,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="${RELEASE_TAG}"
           package_dir="dist-release/${{ matrix.archive }}-${tag}"
           mkdir -p "${package_dir}"
           cp "dist-exe/${{ matrix.executable }}" "${package_dir}/"
@@ -199,7 +206,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          tag="$(printf '%s\n' release-assets/* | sed -n 's/.*-\(v[0-9][0-9A-Za-z.-]*\)\.\(tar\.gz\|zip\)$/\1/p' | sort -Vr | head -n 1)"
+          if [[ -z "${tag}" ]]; then
+            echo "Could not determine release tag from downloaded release assets." >&2
+            exit 1
+          fi
           if gh release view "${tag}" >/dev/null 2>&1; then
             gh release upload "${tag}" release-assets/* --clobber
           else
