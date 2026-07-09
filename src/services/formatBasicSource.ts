@@ -70,7 +70,21 @@ function formatBasicLine(
     return line
   }
 
-  return renderTokens(tokens.map((token) => formatToken(token, context.keywords, protectedLine.labels, context.dialect, context.keywordCase)))
+  return renderTokens(formatTokens(tokens, context.keywords, protectedLine.labels, context.dialect, context.keywordCase))
+}
+
+function formatTokens(
+  tokens: readonly Token[],
+  keywords: ReadonlyMap<TokenKind, KeywordFormat>,
+  labels: ReadonlyMap<string, string>,
+  dialect: BasicDialect,
+  keywordCase: FormatKeywordCase,
+): readonly TokenFormat[] {
+  const formattedTokens = tokens.map((token) => formatToken(token, keywords, labels, dialect, keywordCase))
+  if (isLeadingLabelDefinition(tokens, labels)) {
+    formattedTokens[1] = { ...formattedTokens[1], forceSpaceAfter: true }
+  }
+  return formattedTokens
 }
 
 function formatToken(
@@ -107,6 +121,10 @@ function formatToken(
   }
 
   return formatPunctuation(token.kind, dialect)
+}
+
+function isLeadingLabelDefinition(tokens: readonly Token[], labels: ReadonlyMap<string, string>): boolean {
+  return tokens.length > 2 && tokens[0].kind === 'VARNAME' && labels.has(tokens[0].lexeme) && tokens[1].kind === 'ENDOFSTAT'
 }
 
 function formatKeywordText(text: string, keywordCase: FormatKeywordCase): string {
