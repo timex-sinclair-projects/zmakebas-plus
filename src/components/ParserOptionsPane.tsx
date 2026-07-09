@@ -24,8 +24,8 @@ const spectrumExportFormatOptions: readonly RadioSelectionOption<SpectrumExportF
   { id: 'spectrum-export-plus3dos', label: '+3DOS', value: 'plus3dos' },
 ]
 const formatterKeywordCaseOptions: readonly RadioSelectionOption<FormatKeywordCase>[] = [
-  { id: 'formatter-keyword-case-upper', label: 'UPPERCASE', value: 'upper' },
-  { id: 'formatter-keyword-case-lower', label: 'lowercase', value: 'lower' },
+  { id: 'formatter-keyword-case-upper', label: 'UPPERCASE keywords', value: 'upper' },
+  { id: 'formatter-keyword-case-lower', label: 'lowercase keywords', value: 'lower' },
 ]
 
 type ParserOptionsPaneProps = {

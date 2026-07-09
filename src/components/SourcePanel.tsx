@@ -182,7 +182,7 @@ export function SourcePanel({
               <Dropdown.Divider />
               <Dropdown.Item onClick={onFormatSource}>
                 <BsTextLeft aria-hidden="true" />
-                Format
+                Format all
               </Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item disabled={!canZoomIn} onClick={handleZoomIn}>
