@@ -1,26 +1,20 @@
-import { spectrumTokenDefinitions, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition } from './basicTokens'
 import { isSpectrumFamilyDialect, type BasicDialect } from './dialects'
-import { formatSpectrumDisplayControlEscape, formatSpectrumTextControlEscape } from './exportCommon'
-import { spectrumBlockGraphicSource } from './graphicEscapes'
+import type { ProgramFileEntry, ProgramFileEntryType } from './programFileEntry'
+import { detokenizeBasicProgram } from './spectrumBasicProgram'
 
 export type ImportedTapProgram = {
   readonly source: string
   readonly programName: string | null
 }
 
-export type TapFileEntryType = 'program' | 'number-array' | 'character-array' | 'code' | 'unknown'
+export type TapFileEntryType = ProgramFileEntryType
 
-export type TapFileEntry = {
-  readonly id: number
-  readonly blockIndex: number
-  readonly name: string | null
-  readonly type: TapFileEntryType
-  readonly typeLabel: string
-  readonly dataLength: number
-  readonly loadable: boolean
-  readonly autostartLine: number | null
-  readonly basicLength: number | null
-}
+export type TapFileEntry = ProgramFileEntry
+
+const basicHeaderType = 0x00
+const headerBlockFlag = 0x00
+const dataBlockFlag = 0xff
+const maxBasicLineNumber = 9999
 
 type TapBlock = {
   readonly flag: number
@@ -31,26 +25,6 @@ type TapEntryBlock = {
   readonly entry: TapFileEntry
   readonly dataPayload: Uint8Array
 }
-
-type KeywordText = {
-  readonly text: string
-  readonly needsLeftPadding?: boolean
-  readonly needsRightPadding?: boolean
-}
-
-const tokenNumberMarker = 0x0e
-const lineEndByte = 0x0d
-const basicHeaderType = 0x00
-const headerBlockFlag = 0x00
-const dataBlockFlag = 0xff
-const maxBasicLineNumber = 9999
-
-const spectrumTokenTexts = new Map<number, KeywordText>(spectrumTokenDefinitions.map((definition, tokenIndex) => [definition.byte, romKeywordText(tokenIndex, definition)]))
-
-const ts2068TokenTexts = new Map<number, KeywordText>([
-  ...spectrumTokenTexts,
-  ...ts2068ExtensionTokenDefinitions.map((definition, index) => [definition.byte, romKeywordText(spectrumTokenDefinitions.length + index, definition)] as const),
-])
 
 export function importTapFile(bytes: Uint8Array, dialect: BasicDialect): ImportedTapProgram {
   const program = listTapFileEntries(bytes).find((entry) => entry.loadable)
@@ -142,6 +116,7 @@ function parseTapEntries(bytes: Uint8Array): TapEntryBlock[] {
       dataPayload: data.payload,
       entry: {
         autostartLine: loadable ? autostartLine : null,
+        autostart: loadable && autostartLine !== null,
         basicLength: loadable ? basicLength : null,
         blockIndex: index,
         dataLength,
@@ -189,217 +164,6 @@ function tapEntryTypeLabel(type: TapFileEntryType): string {
     case 'unknown':
       return 'Unknown'
   }
-}
-
-function detokenizeBasicProgram(programBytes: Uint8Array, dialect: BasicDialect): string {
-  const lines: string[] = []
-  let offset = 0
-
-  while (offset < programBytes.length) {
-    if (offset + 4 > programBytes.length) {
-      throw new Error('Invalid BASIC program: truncated line header.')
-    }
-
-    const lineNumber = (programBytes[offset] << 8) | programBytes[offset + 1]
-    const lineLength = readWord(programBytes, offset + 2)
-    offset += 4
-
-    if (lineLength === 0 || offset + lineLength > programBytes.length) {
-      throw new Error(`Invalid BASIC program: truncated line ${lineNumber}.`)
-    }
-
-    const lineBytes = programBytes.subarray(offset, offset + lineLength)
-    if (lineBytes[lineBytes.length - 1] !== lineEndByte) {
-      throw new Error(`Invalid BASIC program: line ${lineNumber} is missing its terminator.`)
-    }
-
-    lines.push(`${lineNumber} ${detokenizeLine(lineBytes.subarray(0, lineBytes.length - 1), dialect).trimEnd()}`)
-    offset += lineLength
-  }
-
-  return lines.join('\n')
-}
-
-function detokenizeLine(lineBytes: Uint8Array, dialect: BasicDialect): string {
-  const keywordTexts = dialect === 'ts2068' ? ts2068TokenTexts : spectrumTokenTexts
-  let output = ''
-  let inString = false
-  let justAppendedKeywordPadding = false
-
-  for (let index = 0; index < lineBytes.length; index += 1) {
-    const byte = lineBytes[index]
-
-    if (inString) {
-      const textControl = textControlSource(lineBytes, index)
-      if (textControl) {
-        output += textControl.source
-        index += textControl.consumed - 1
-        justAppendedKeywordPadding = false
-        continue
-      }
-
-      output += byteToStringSource(byte)
-      justAppendedKeywordPadding = false
-      if (byte === 0x22) {
-        inString = false
-      }
-      continue
-    }
-
-    if (byte === tokenNumberMarker && index + 5 < lineBytes.length) {
-      index += 5
-      continue
-    }
-
-    if (byte === 0x20 && justAppendedKeywordPadding) {
-      continue
-    }
-
-    if (byte === 0x22) {
-      output += '"'
-      inString = true
-      justAppendedKeywordPadding = false
-      continue
-    }
-
-    if (byte === 0x3a) {
-      output += ': '
-      justAppendedKeywordPadding = true
-      continue
-    }
-
-    const keyword = keywordTexts.get(byte)
-    if (keyword) {
-      if (byte === 0xea) {
-        return `${output}${keyword.text} ${detokenizeRem(lineBytes.subarray(index + 1))}`
-      }
-
-      output = appendKeyword(output, keyword)
-      justAppendedKeywordPadding = Boolean(keyword.needsRightPadding)
-      continue
-    }
-
-    const displayControl = displayControlSource(lineBytes, index)
-    if (displayControl) {
-      output += displayControl.source
-      index += 1
-      justAppendedKeywordPadding = false
-      continue
-    }
-
-    output += byteToPlainSource(byte)
-    justAppendedKeywordPadding = false
-  }
-
-  return output
-}
-
-function appendKeyword(output: string, keyword: KeywordText): string {
-  const leftPadding = keyword.needsLeftPadding && needsSourceSeparatorBefore(output) ? ' ' : ''
-  const nextOutput = `${output}${leftPadding}${keyword.text}`
-  return keyword.needsRightPadding ? `${nextOutput} ` : nextOutput
-}
-
-function romKeywordText(tokenIndex: number, definition: BasicTokenDefinition): KeywordText {
-  const lastChar = definition.text[definition.text.length - 1] ?? ''
-
-  // Mirrors the Spectrum/TS2068 ROM PO-TOKENS/PO-SEARCH spacing rules.
-  return {
-    text: definition.text,
-    needsLeftPadding: tokenIndex >= 0x20 && /^[A-Z]/.test(definition.text),
-    needsRightPadding: tokenIndex >= 3 && (lastChar === '$' || lastChar >= 'A'),
-  }
-}
-
-function needsSourceSeparatorBefore(output: string): boolean {
-  const previous = output[output.length - 1]
-  return previous !== undefined && !/[ \t:(,;+\-*/^=<>#']/.test(previous)
-}
-
-function detokenizeRem(bytes: Uint8Array): string {
-  let output = ''
-  for (let index = 0; index < bytes.length; index += 1) {
-    const textControl = textControlSource(bytes, index)
-    if (textControl) {
-      output += textControl.source
-      index += textControl.consumed - 1
-      continue
-    }
-
-    output += byteToRemSource(bytes[index], index === bytes.length - 1)
-  }
-  return output
-}
-
-function textControlSource(bytes: Uint8Array, index: number): { readonly consumed: number; readonly source: string } | null {
-  return formatSpectrumTextControlEscape(bytes, index)
-}
-
-function displayControlSource(bytes: Uint8Array, index: number): { readonly source: string } | null {
-  if (index + 1 >= bytes.length) {
-    return null
-  }
-
-  const source = formatSpectrumDisplayControlEscape(bytes[index], bytes[index + 1])
-  return source ? { source } : null
-}
-
-function byteToStringSource(byte: number): string {
-  if (byte === 0x22) {
-    return '"'
-  }
-
-  if (byte === 0x5c) {
-    return '\\\\'
-  }
-
-  if (byte === 0x7f) {
-    return '\\*'
-  }
-
-  const blockGraphic = spectrumBlockGraphicSource(byte)
-  if (blockGraphic) {
-    return blockGraphic
-  }
-
-  if (byte >= 0x20 && byte <= 0x7e) {
-    return String.fromCharCode(byte)
-  }
-
-  return `\\{${byte}}`
-}
-
-function byteToRemSource(byte: number, isLastByte: boolean): string {
-  if (byte === 0x5c) {
-    return '\\\\'
-  }
-
-  if (byte === 0x7f) {
-    return '\\*'
-  }
-
-  const blockGraphic = spectrumBlockGraphicSource(byte)
-  if (blockGraphic) {
-    if (isLastByte && blockGraphic.endsWith(' ')) {
-      return `\\{${byte}}`
-    }
-
-    return blockGraphic
-  }
-
-  if (byte >= 0x20 && byte <= 0x7e) {
-    return String.fromCharCode(byte)
-  }
-
-  return `\\{${byte}}`
-}
-
-function byteToPlainSource(byte: number): string {
-  if (byte >= 0x20 && byte <= 0x7e) {
-    return String.fromCharCode(byte)
-  }
-
-  return `\\{${byte}}`
 }
 
 function decodeTapName(bytes: Uint8Array): string | null {

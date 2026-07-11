@@ -2,7 +2,7 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import Modal from 'react-bootstrap/Modal'
-import { isPlus3DosExport, programFileFormatName, type SpectrumExportFormat } from '../services/programFile'
+import { isDockExport, isPlus3DosExport, programFileFormatName, type ProgramExportFormat } from '../services/programFile'
 import type { BasicDialect } from '../parser'
 import { NumberStepper } from './NumberStepper'
 
@@ -11,17 +11,18 @@ type ExportDialogProps = {
   readonly autostartLine: string
   readonly dialect: BasicDialect
   readonly programName: string
-  readonly spectrumExportFormat: SpectrumExportFormat
-  readonly updateImportedTapAvailable: boolean
-  readonly updateImportedTapEnabled: boolean
+  readonly programExportFormat: ProgramExportFormat
+  readonly updateImportedFileAvailable: boolean
+  readonly updateImportedFileEnabled: boolean
+  readonly updateImportedFileFormatName: string
   readonly show: boolean
   readonly validAutostartLines: readonly number[]
   readonly onCancel: () => void
   readonly onAutostartEnabledChange: (enabled: boolean) => void
   readonly onAutostartLineChange: (line: string) => void
   readonly onProgramNameChange: (programName: string) => void
-  readonly onUpdateImportedTapEnabledChange: (enabled: boolean) => void
-  readonly onConfirm: (programName: string, autostartLine: number | null, updateImportedTap: boolean) => void
+  readonly onUpdateImportedFileEnabledChange: (enabled: boolean) => void
+  readonly onConfirm: (programName: string, autostartLine: number | null, updateImportedFile: boolean) => void
 }
 
 export function ExportDialog({
@@ -29,20 +30,21 @@ export function ExportDialog({
   autostartLine,
   dialect,
   programName,
-  spectrumExportFormat,
-  updateImportedTapAvailable,
-  updateImportedTapEnabled,
+  programExportFormat,
+  updateImportedFileAvailable,
+  updateImportedFileEnabled,
+  updateImportedFileFormatName,
   show,
   validAutostartLines,
   onCancel,
   onAutostartEnabledChange,
   onAutostartLineChange,
   onProgramNameChange,
-  onUpdateImportedTapEnabledChange,
+  onUpdateImportedFileEnabledChange,
   onConfirm,
 }: ExportDialogProps) {
-  const formatName = programFileFormatName(dialect, spectrumExportFormat)
-  const fileNameOnlyFormat = dialect === 'zx81' || isPlus3DosExport(dialect, spectrumExportFormat)
+  const formatName = programFileFormatName(dialect, programExportFormat)
+  const fileNameOnlyFormat = dialect === 'zx81' || isPlus3DosExport(dialect, programExportFormat) || isDockExport(dialect, programExportFormat)
   const parsedAutostartLine = parseAutostartLine(autostartLine)
   const resolvedAutostartLine = parsedAutostartLine === null ? null : resolveAutostartLine(parsedAutostartLine, validAutostartLines)
   const hasAutostartError = autostartEnabled && resolvedAutostartLine === null
@@ -66,7 +68,7 @@ export function ExportDialog({
       return
     }
 
-    onConfirm(programName, autostartEnabled ? resolvedAutostartLine : null, updateImportedTapAvailable && updateImportedTapEnabled)
+    onConfirm(programName, autostartEnabled ? resolvedAutostartLine : null, updateImportedFileAvailable && updateImportedFileEnabled)
   }
 
   function handleAutostartKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
@@ -147,15 +149,15 @@ export function ExportDialog({
               <span className={hasAutostartError ? 'invalid-feedback d-block' : 'form-text text-muted'}>{autostartMessage || '\u00a0'}</span>
             </div>
           </Form.Group>
-          {updateImportedTapAvailable ? (
+          {updateImportedFileAvailable ? (
             <Form.Group className="mt-3">
               <Form.Check
-                checked={updateImportedTapEnabled}
-                id="update-imported-tap"
-                label="Update imported TAP entry"
-                onChange={(event) => onUpdateImportedTapEnabledChange(event.currentTarget.checked)}
+                checked={updateImportedFileEnabled}
+                id="update-imported-file"
+                label={`Update imported ${updateImportedFileFormatName} entry`}
+                onChange={(event) => onUpdateImportedFileEnabledChange(event.currentTarget.checked)}
               />
-              <Form.Text muted>Preserve the imported TAP file and replace only the selected BASIC program entry.</Form.Text>
+              <Form.Text muted>Preserve the imported {updateImportedFileFormatName} file and replace only the selected BASIC program entry.</Form.Text>
             </Form.Group>
           ) : null}
         </Modal.Body>

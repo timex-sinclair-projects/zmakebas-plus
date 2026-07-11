@@ -1,4 +1,4 @@
-import { defaultSpectrumExportFormat, type SpectrumExportFormat } from './programFile'
+import { defaultProgramExportFormat, type ProgramExportFormat } from './programFile'
 import type { FormatKeywordCase } from './formatBasicSource'
 import { defaultDialect, type BasicDialect } from '../parser/dialects'
 
@@ -20,7 +20,7 @@ export interface IPreferenceValues {
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
-  readonly spectrumExportFormat: SpectrumExportFormat
+  readonly programExportFormat: ProgramExportFormat
 }
 
 export type PreferenceKey = keyof IPreferenceValues
@@ -44,10 +44,11 @@ export const preferenceDefaults: IPreferenceValues = {
   screenWidth: 32,
   screenWrapHintsEnabled: true,
   spectranetEnabled: false,
-  spectrumExportFormat: defaultSpectrumExportFormat,
+  programExportFormat: defaultProgramExportFormat,
 }
 
 type StoredPreferences = Partial<IPreferenceValues> & {
+  readonly spectrumExportFormat?: unknown
   readonly version?: number
 }
 
@@ -70,7 +71,7 @@ export function loadPreferences(): IPreferenceValues {
     screenWidth: readIntegerPreference(storedPreferences.screenWidth, preferenceDefaults.screenWidth, 1, 256),
     screenWrapHintsEnabled: readBooleanPreference(storedPreferences.screenWrapHintsEnabled, preferenceDefaults.screenWrapHintsEnabled),
     spectranetEnabled: readBooleanPreference(storedPreferences.spectranetEnabled, preferenceDefaults.spectranetEnabled),
-    spectrumExportFormat: readSpectrumExportFormatPreference(storedPreferences.spectrumExportFormat, preferenceDefaults.spectrumExportFormat),
+    programExportFormat: readProgramExportFormatPreference(storedPreferences.programExportFormat ?? storedPreferences.spectrumExportFormat, preferenceDefaults.programExportFormat),
   }
 }
 
@@ -171,6 +172,6 @@ function readOptionsSectionCollapsedPreference(value: unknown, defaultValue: Opt
   }
 }
 
-function readSpectrumExportFormatPreference(value: unknown, defaultValue: SpectrumExportFormat): SpectrumExportFormat {
-  return value === 'tap' || value === 'plus3dos' ? value : defaultValue
+function readProgramExportFormatPreference(value: unknown, defaultValue: ProgramExportFormat): ProgramExportFormat {
+  return value === 'tap' || value === 'plus3dos' || value === 'dck' ? value : defaultValue
 }

@@ -1,6 +1,6 @@
 import { BsCheckCircleFill, BsExclamationTriangleFill } from 'react-icons/bs'
 import type { BasicDialect, StatementNode } from '../parser'
-import { programFileFormatName, type SpectrumExportFormat } from '../services/programFile'
+import { programFileFormatName, type ProgramExportFormat } from '../services/programFile'
 import { zmakebasVersion } from '../version'
 import type { ParseState, SourceCursorPosition } from './types'
 
@@ -9,10 +9,10 @@ type ParserStatusAlertProps = {
   readonly dialect: BasicDialect
   readonly isSourceUnvalidated: boolean
   readonly parseState: ParseState
-  readonly spectrumExportFormat: SpectrumExportFormat
+  readonly programExportFormat: ProgramExportFormat
 }
 
-export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated, parseState, spectrumExportFormat }: ParserStatusAlertProps) {
+export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated, parseState, programExportFormat }: ParserStatusAlertProps) {
   if (isSourceUnvalidated) {
     return (
       <footer className="status-bar status-warning">
@@ -33,7 +33,7 @@ export function ParserStatusAlert({ cursorPosition, dialect, isSourceUnvalidated
   if (parseState.ok) {
     const lineCount = parseState.ast.lines.length
     const statementCount = countStatements(parseState.ast.lines.flatMap((line) => line.statements))
-    const downloadFormatLabel = `${programFileFormatName(dialect, spectrumExportFormat)} file`
+    const downloadFormatLabel = `${programFileFormatName(dialect, programExportFormat)} file`
 
     return (
       <footer className="status-bar status-ok">

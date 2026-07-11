@@ -6,7 +6,7 @@ import Form from 'react-bootstrap/Form'
 import { BsArrowClockwise, BsChevronDown } from 'react-icons/bs'
 import type { FormatKeywordCase } from '../services/formatBasicSource'
 import type { OptionsPaneSectionCollapsedStates, OptionsPaneSectionId } from '../services/preferences'
-import type { SpectrumExportFormat } from '../services/programFile'
+import type { ProgramExportFormat } from '../services/programFile'
 import type { BasicDialect } from '../parser'
 import { NumberStepper } from './NumberStepper'
 import { RadioSelection, type RadioSelectionOption } from './RadioSelection'
@@ -19,9 +19,13 @@ const targetDialectOptions: readonly RadioSelectionOption<BasicDialect>[] = [
   { id: 'dialect-ts2068', label: 'TS2068', value: 'ts2068' },
   { id: 'dialect-zx81', label: 'ZX81', value: 'zx81' },
 ]
-const spectrumExportFormatOptions: readonly RadioSelectionOption<SpectrumExportFormat>[] = [
+const spectrumProgramExportFormatOptions: readonly RadioSelectionOption<ProgramExportFormat>[] = [
   { id: 'spectrum-export-tap', label: 'TAP', value: 'tap' },
   { id: 'spectrum-export-plus3dos', label: '+3DOS', value: 'plus3dos' },
+]
+const ts2068ExportFormatOptions: readonly RadioSelectionOption<ProgramExportFormat>[] = [
+  { id: 'ts2068-export-tap', label: 'TAP', value: 'tap' },
+  { id: 'ts2068-export-dck', label: 'DCK', value: 'dck' },
 ]
 const formatterKeywordCaseOptions: readonly RadioSelectionOption<FormatKeywordCase>[] = [
   { id: 'formatter-keyword-case-upper', label: 'UPPERCASE keywords', value: 'upper' },
@@ -41,7 +45,7 @@ type ParserOptionsPaneProps = {
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
-  readonly spectrumExportFormat: SpectrumExportFormat
+  readonly programExportFormat: ProgramExportFormat
   readonly onAutomaticParsingEnabledChange: (enabled: boolean) => void
   readonly onDiagnosticsOpenChange: (open: boolean) => void
   readonly onDialectChange: (dialect: BasicDialect) => void
@@ -53,7 +57,7 @@ type ParserOptionsPaneProps = {
   readonly onScreenWidthChange: (width: number) => void
   readonly onScreenWrapHintsEnabledChange: (enabled: boolean) => void
   readonly onSpectranetEnabledChange: (enabled: boolean) => void
-  readonly onSpectrumExportFormatChange: (format: SpectrumExportFormat) => void
+  readonly onProgramExportFormatChange: (format: ProgramExportFormat) => void
   readonly onValidate: () => void
 }
 
@@ -70,7 +74,7 @@ export function ParserOptionsPane({
   screenWidth,
   screenWrapHintsEnabled,
   spectranetEnabled,
-  spectrumExportFormat,
+  programExportFormat,
   onAutomaticParsingEnabledChange,
   onDiagnosticsOpenChange,
   onDialectChange,
@@ -82,7 +86,7 @@ export function ParserOptionsPane({
   onScreenWidthChange,
   onScreenWrapHintsEnabledChange,
   onSpectranetEnabledChange,
-  onSpectrumExportFormatChange,
+  onProgramExportFormatChange,
   onValidate,
 }: ParserOptionsPaneProps) {
   function isSectionOpen(sectionId: OptionsPaneSectionId): boolean {
@@ -128,7 +132,13 @@ export function ParserOptionsPane({
 
         {dialect === 'spectrum' ? (
           <CollapsibleOptionGroup title="Export" {...sectionProps('export')}>
-            <RadioSelection ariaLabel="Spectrum export format" name="spectrum-export-format" options={spectrumExportFormatOptions} value={spectrumExportFormat} onChange={onSpectrumExportFormatChange} />
+            <RadioSelection ariaLabel="Spectrum export format" name="spectrum-export-format" options={spectrumProgramExportFormatOptions} value={programExportFormat} onChange={onProgramExportFormatChange} />
+          </CollapsibleOptionGroup>
+        ) : null}
+
+        {dialect === 'ts2068' ? (
+          <CollapsibleOptionGroup title="Export" {...sectionProps('export')}>
+            <RadioSelection ariaLabel="TS2068 export format" name="ts2068-export-format" options={ts2068ExportFormatOptions} value={programExportFormat} onChange={onProgramExportFormatChange} />
           </CollapsibleOptionGroup>
         ) : null}
 

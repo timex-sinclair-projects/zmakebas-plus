@@ -625,7 +625,7 @@
   white-space: pre-wrap;
 }
 
-.tap-selection-file-name {
+.program-file-selection-file-name {
   margin-bottom: 12px;
   overflow: hidden;
   color: var(--bs-secondary-color);
@@ -634,7 +634,7 @@
   white-space: nowrap;
 }
 
-.tap-entry-list {
+.program-file-entry-list {
   display: grid;
   max-height: min(52vh, 480px);
   overflow: auto;
@@ -642,7 +642,7 @@
   border-radius: 6px;
 }
 
-.tap-entry-option {
+.program-file-entry-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
@@ -671,22 +671,22 @@
   }
 }
 
-.tap-entry-input {
+.program-file-entry-input {
   margin: 0;
 }
 
-.tap-entry-copy,
-.tap-entry-title,
-.tap-entry-meta {
+.program-file-entry-copy,
+.program-file-entry-title,
+.program-file-entry-meta {
   min-width: 0;
 }
 
-.tap-entry-copy {
+.program-file-entry-copy {
   display: grid;
   gap: 2px;
 }
 
-.tap-entry-title {
+.program-file-entry-title {
   display: flex;
   gap: 8px;
   align-items: baseline;
@@ -694,15 +694,19 @@
   font-weight: 600;
 }
 
-.tap-entry-type,
-.tap-entry-meta {
+.program-file-entry-type,
+.program-file-entry-meta {
   color: var(--bs-secondary-color);
   font-size: 0.8125rem;
   font-weight: 400;
 }
 
-.tap-entry-meta {
+.program-file-entry-meta {
   overflow-wrap: anywhere;
+}
+
+.program-file-entry-warning-icon {
+  color: #997404;
 }
 
 .tool-panel {

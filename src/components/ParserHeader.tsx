@@ -2,7 +2,7 @@ import { useRef, type ChangeEvent } from 'react'
 import Button from 'react-bootstrap/Button'
 import ButtonGroup from 'react-bootstrap/ButtonGroup'
 import { BsDownload, BsEraserFill, BsFileEarmarkCodeFill, BsList, BsUpload } from 'react-icons/bs'
-import { programFileFormatName, type SpectrumExportFormat } from '../services/programFile'
+import { programFileFormatName, type ProgramExportFormat } from '../services/programFile'
 import type { BasicDialect } from '../parser'
 import { dialectLabel } from '../parser/dialects'
 
@@ -10,7 +10,7 @@ type ParserHeaderProps = {
   readonly canDownloadProgram: boolean
   readonly dialect: BasicDialect
   readonly optionsCollapsed: boolean
-  readonly spectrumExportFormat: SpectrumExportFormat
+  readonly programExportFormat: ProgramExportFormat
   readonly onOptionsToggle: () => void
   readonly onLoadSample: () => void
   readonly onClear: () => void
@@ -23,7 +23,7 @@ export function ParserHeader({
   canDownloadProgram,
   dialect,
   optionsCollapsed,
-  spectrumExportFormat,
+  programExportFormat,
   onOptionsToggle,
   onLoadSample,
   onClear,
@@ -32,8 +32,8 @@ export function ParserHeader({
   onDownloadProgram,
 }: ParserHeaderProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
-  const exportLabel = `${programFileFormatName(dialect, spectrumExportFormat)} file`
-  const uploadAccept = dialect === 'zx81' ? '.bas,.txt,.p,text/plain' : '.bas,.txt,.tap,text/plain'
+  const exportLabel = `${programFileFormatName(dialect, programExportFormat)} file`
+  const uploadAccept = dialect === 'zx81' ? '.bas,.txt,.p,text/plain' : dialect === 'ts2068' ? '.bas,.txt,.tap,.dck,text/plain' : '.bas,.txt,.tap,text/plain'
 
   function handleUploadChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.currentTarget.files?.[0]

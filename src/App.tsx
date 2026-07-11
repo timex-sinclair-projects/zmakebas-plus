@@ -10,7 +10,7 @@ import { ParserResults } from './components/ParserResults'
 import { ParserStatusAlert } from './components/ParserStatusAlert'
 import { ReplaceSourceDialog, type ReplaceSourceAction } from './components/ReplaceSourceDialog'
 import { SourcePanel } from './components/SourcePanel'
-import { TapSelectionDialog } from './components/TapSelectionDialog'
+import { ProgramFileSelectionDialog } from './components/ProgramFileSelectionDialog'
 import type { LineNavigationRequest, ParseState, SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest } from './components/types'
 import { useBusyIndicator } from './hooks/useBusyIndicator'
 import { usePreference } from './hooks/usePreference'
@@ -58,7 +58,7 @@ function App() {
   const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null)
   const [screenWrapHintsEnabled, setScreenWrapHintsEnabled] = usePreference('screenWrapHintsEnabled')
   const [screenWidth, setScreenWidth] = usePreference('screenWidth')
-  const [spectrumExportFormat, setSpectrumExportFormat] = usePreference('spectrumExportFormat')
+  const [programExportFormat, setProgramExportFormat] = usePreference('programExportFormat')
   const [formatterKeywordCase, setFormatterKeywordCase] = usePreference('formatterKeywordCase')
   const [optionsSectionCollapsed, setOptionsSectionCollapsed] = usePreference('optionsSectionCollapsed')
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
@@ -72,13 +72,13 @@ function App() {
     labelModeEnabled,
     labelStartLine,
     source,
-    spectrumExportFormat,
+    programExportFormat,
     validAutostartLines,
     onProcessingEnd: stopProcessing,
     onProcessingStart: startProcessing,
     onError: setAlertMessage,
     onRequestParse: requestParse,
-    onSpectrumExportFormatChange: setSpectrumExportFormat,
+    onProgramExportFormatChange: setProgramExportFormat,
     onSourceLoaded: (nextSource) => {
       commitSource(nextSource, {
         clearNavigationAfterCommit: true,
@@ -104,7 +104,7 @@ function App() {
   }
 
   function handleReplaceSource(nextSource: string): void {
-    programFiles.clearImportedTapEdit()
+    programFiles.clearImportedProgramFileEdit()
     commitSource(nextSource, {
       clearNavigationAfterCommit: true,
       requestParseAfterCommit: true,
@@ -241,9 +241,9 @@ function App() {
     if (automaticParsingEnabled) {
       startProcessing()
     }
-    programFiles.clearImportedTapEdit()
-    if ((nextDialect === 'spectrum' && spectrumExportFormat === 'dck') || (nextDialect === 'ts2068' && spectrumExportFormat === 'plus3dos')) {
-      setSpectrumExportFormat('tap')
+    programFiles.clearImportedProgramFileEdit()
+    if ((nextDialect === 'spectrum' && programExportFormat === 'dck') || (nextDialect === 'ts2068' && programExportFormat === 'plus3dos')) {
+      setProgramExportFormat('tap')
     }
     setDialect(nextDialect)
     clearNavigation()
@@ -319,7 +319,7 @@ function App() {
           dialect={dialect}
           canDownloadProgram={parseState.ok && !hasUnparsedDraft}
           optionsCollapsed={optionsCollapsed}
-          spectrumExportFormat={spectrumExportFormat}
+          programExportFormat={programExportFormat}
           onOptionsToggle={() => setOptionsCollapsed(!optionsCollapsed)}
           onLoadSample={() => handleRequestReplaceSource('sample')}
           onClear={() => handleRequestReplaceSource('clear')}
@@ -341,7 +341,7 @@ function App() {
           dialect={dialect}
           programName={programFiles.programName}
           show={programFiles.isExportDialogOpen}
-          spectrumExportFormat={spectrumExportFormat}
+          programExportFormat={programExportFormat}
           updateImportedFileAvailable={programFiles.updateImportedFileAvailable}
           updateImportedFileEnabled={programFiles.updateImportedFileEnabled}
           updateImportedFileFormatName={programFiles.updateImportedFileFormatName}
@@ -350,20 +350,23 @@ function App() {
           onAutostartEnabledChange={programFiles.handleAutostartEnabledChange}
           onAutostartLineChange={programFiles.setAutostartLine}
           onProgramNameChange={programFiles.setProgramName}
-          onUpdateImportedTapEnabledChange={programFiles.setUpdateImportedTapEnabled}
-          onConfirm={(programName, autostartLine, updateImportedTap) => {
-            void programFiles.handleConfirmExport(programName, autostartLine, updateImportedTap)
+          onUpdateImportedFileEnabledChange={programFiles.setUpdateImportedProgramFileEnabled}
+          onConfirm={(programName, autostartLine, updateImportedFile) => {
+            void programFiles.handleConfirmExport(programName, autostartLine, updateImportedFile)
           }}
         />
-        {programFiles.pendingTapSelection ? (
-          <TapSelectionDialog
-            entries={programFiles.pendingTapSelection.entries}
-            formatName={programFiles.pendingTapSelection.formatName}
-            fileName={programFiles.pendingTapSelection.fileName}
+        {programFiles.pendingProgramFileSelection ? (
+          <ProgramFileSelectionDialog
+            confirmLabel={programFiles.pendingProgramFileSelection.confirmLabel}
+            entries={programFiles.pendingProgramFileSelection.entries}
+            formatName={programFiles.pendingProgramFileSelection.formatName}
+            fileName={programFiles.pendingProgramFileSelection.fileName}
+            showFileName={programFiles.pendingProgramFileSelection.showFileName}
             show
-            onCancel={programFiles.handleCancelTapSelection}
+            warningMessage={programFiles.pendingProgramFileSelection.warningMessage}
+            onCancel={programFiles.handleCancelProgramFileSelection}
             onConfirm={(entryId) => {
-              void programFiles.handleConfirmTapSelection(entryId)
+              void programFiles.handleConfirmProgramFileSelection(entryId)
             }}
           />
         ) : null}
@@ -385,7 +388,7 @@ function App() {
                   screenWidth={screenWidth}
                   screenWrapHintsEnabled={screenWrapHintsEnabled}
                   spectranetEnabled={spectranetEnabled}
-                  spectrumExportFormat={spectrumExportFormat}
+                  programExportFormat={programExportFormat}
                   onAutomaticParsingEnabledChange={handleAutomaticParsingEnabledChange}
                   onDiagnosticsOpenChange={handleShowResultsChange}
                   onDialectChange={handleDialectChange}
@@ -397,7 +400,7 @@ function App() {
                   onScreenWidthChange={setScreenWidth}
                   onScreenWrapHintsEnabledChange={setScreenWrapHintsEnabled}
                   onSpectranetEnabledChange={handleSpectranetEnabledChange}
-                  onSpectrumExportFormatChange={setSpectrumExportFormat}
+                  onProgramExportFormatChange={setProgramExportFormat}
                   onValidate={() => handleRefreshParse(sourceDraftRef.current)}
                 />
               </div>
@@ -445,7 +448,7 @@ function App() {
         dialect={dialect}
         isSourceUnvalidated={!automaticParsingEnabled && hasUnparsedDraft}
         parseState={parseState}
-        spectrumExportFormat={spectrumExportFormat}
+        programExportFormat={programExportFormat}
       />
     </main>
   )

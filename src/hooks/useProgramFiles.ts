@@ -1,19 +1,22 @@
 import { useState } from 'react'
-import { isPlus3DosExport, programFileDescription, programFileExtension, type SpectrumExportFormat } from '../services/programFile'
+import { isDockExport, isPlus3DosExport, programFileDescription, programFileExtension, type ProgramExportFormat } from '../services/programFile'
 import {
+  createDockFile,
   createPlus3DosFile,
   createTapFile,
   createZx81PFile,
+  importDockFileEntry,
   importTapFileEntry,
   importPFile,
+  listDockFileEntries,
   listTapFileEntries,
   parseZxBasic,
   preprocessLabels,
+  updateDockFileProgramEntry,
   updateTapFileProgramEntry,
   type BasicDialect,
   type BasicExtension,
-  type ImportedTapProgram,
-  type TapFileEntry,
+  type ProgramFileEntry,
 } from '../parser'
 import { isSpectrumFamilyDialect } from '../parser/dialects'
 
@@ -50,37 +53,44 @@ type UseProgramFilesOptions = {
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
   readonly source: string
-  readonly spectrumExportFormat: SpectrumExportFormat
+  readonly programExportFormat: ProgramExportFormat
   readonly validAutostartLines: readonly number[]
   readonly onProcessingEnd: () => void
   readonly onProcessingStart: () => void
+  readonly onError: (message: string) => void
   readonly onRequestParse: (source?: string) => void
+  readonly onProgramExportFormatChange: (format: ProgramExportFormat) => void
   readonly onSourceLoaded: (source: string) => void
 }
 
-export type PendingTapSelection = {
-  readonly entries: readonly TapFileEntry[]
+export type PendingProgramFileSelection = {
+  readonly confirmLabel?: string
+  readonly entries: readonly ProgramFileEntry[]
+  readonly formatName: string
   readonly fileName: string
+  readonly showFileName?: boolean
+  readonly warningMessage?: string
 }
 
 export type ProgramFilesState = {
   readonly autostartEnabled: boolean
   readonly autostartLine: string
-  readonly updateImportedTapAvailable: boolean
-  readonly updateImportedTapEnabled: boolean
+  readonly updateImportedFileAvailable: boolean
+  readonly updateImportedFileEnabled: boolean
+  readonly updateImportedFileFormatName: string
   readonly isExportDialogOpen: boolean
-  readonly pendingTapSelection: PendingTapSelection | null
+  readonly pendingProgramFileSelection: PendingProgramFileSelection | null
   readonly programName: string
   readonly handleAutostartEnabledChange: (enabled: boolean) => void
-  readonly handleCancelTapSelection: () => void
-  readonly handleConfirmExport: (programName: string, autostartLine: number | null, updateImportedTap?: boolean) => Promise<void>
-  readonly handleConfirmTapSelection: (entryId: number) => Promise<void>
+  readonly handleCancelProgramFileSelection: () => void
+  readonly handleConfirmExport: (programName: string, autostartLine: number | null, updateImportedFile?: boolean) => Promise<void>
+  readonly handleConfirmProgramFileSelection: (entryId: number) => Promise<void>
   readonly handleOpenExportDialog: (source?: string) => void
   readonly handleSaveSource: () => Promise<void>
   readonly handleUploadSource: (file: File) => Promise<void>
-  readonly clearImportedTapEdit: () => void
+  readonly clearImportedProgramFileEdit: () => void
   readonly setAutostartLine: (line: string) => void
-  readonly setUpdateImportedTapEnabled: (enabled: boolean) => void
+  readonly setUpdateImportedProgramFileEnabled: (enabled: boolean) => void
   readonly setIsExportDialogOpen: (isOpen: boolean) => void
   readonly setProgramName: (programName: string) => void
   readonly updateDefaultAutostartLine: (source: string) => void
@@ -94,22 +104,30 @@ export function useProgramFiles({
   labelStartLine,
   onProcessingEnd,
   onProcessingStart,
+  onError,
   onRequestParse,
+  onProgramExportFormatChange,
   onSourceLoaded,
   source,
-  spectrumExportFormat,
+  programExportFormat,
   validAutostartLines,
 }: UseProgramFilesOptions): ProgramFilesState {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [programName, setProgramName] = useState(defaultProgramName)
   const [autostartEnabled, setAutostartEnabled] = useState(false)
   const [autostartLine, setAutostartLine] = useState(firstBasicLineNumberText(source) ?? fallbackAutostartLine)
-  const [pendingTapUpload, setPendingTapUpload] = useState<PendingTapUpload | null>(null)
-  const [importedTapEdit, setImportedTapEdit] = useState<ImportedTapEdit | null>(null)
-  const [updateImportedTapEnabled, setUpdateImportedTapEnabled] = useState(false)
+  const [pendingProgramFileUpload, setPendingProgramFileUpload] = useState<PendingProgramFileUpload | null>(null)
+  const [importedProgramFileEdit, setImportedProgramFileEdit] = useState<ImportedProgramEdit | null>(null)
+  const [updateImportedProgramFileEnabled, setUpdateImportedProgramFileEnabled] = useState(false)
   const defaultAutostartLine = defaultAutostartLineText(validAutostartLines, source, labelModeEnabled, labelStartLine)
-  const plus3DosExport = isPlus3DosExport(dialect, spectrumExportFormat)
-  const updateImportedTapAvailable = importedTapEdit !== null && isSpectrumFamilyDialect(dialect) && !plus3DosExport
+  const plus3DosExport = isPlus3DosExport(dialect, programExportFormat)
+  const dockExport = isDockExport(dialect, programExportFormat)
+  const updateImportedFileAvailable =
+    importedProgramFileEdit !== null &&
+    isSpectrumFamilyDialect(dialect) &&
+    !plus3DosExport &&
+    ((importedProgramFileEdit.format === 'tap' && !dockExport) || (importedProgramFileEdit.format === 'dck' && dockExport))
+  const updateImportedFileFormatName = importedProgramFileEdit?.format === 'dck' ? 'DCK' : 'TAP'
 
   function updateDefaultAutostartLine(nextSource: string): void {
     if (autostartEnabled) {
@@ -133,19 +151,49 @@ export function useProgramFiles({
       const uploadedProgramName = normalizeUploadedProgramName(uploaded.programName ?? fileStem(file.name), dialect)
       loadUploadedSource(uploadedSource, uploadedProgramName, { updateAutostartLine: !uploaded.autostartLineInitialized })
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to load source file.')
+      onError(error instanceof Error ? error.message : 'Unable to load source file.')
       onProcessingEnd()
     }
   }
 
   async function readUploadedSource(file: File): Promise<UploadedProgram | null> {
-    if (!file.name.toLowerCase().endsWith('.tap')) {
-      if (file.name.toLowerCase().endsWith('.p')) {
+    const lowerFileName = file.name.toLowerCase()
+    if (!lowerFileName.endsWith('.tap')) {
+      if (lowerFileName.endsWith('.dck')) {
+        if (dialect !== 'ts2068') {
+          throw new Error('DCK upload is supported in TS2068 mode.')
+        }
+
+        onProgramExportFormatChange('dck')
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        const entries = listDockFileEntries(bytes)
+        const entry = entries.find((programFileEntry) => programFileEntry.loadable)
+        if (entries.length > 1 || !entry) {
+          clearImportedProgramFileEdit()
+          setPendingProgramFileUpload({
+            bytes,
+            confirmLabel: entry ? undefined : 'OK',
+            entries,
+            fileName: file.name,
+            format: 'dck',
+            formatName: 'DCK',
+            showFileName: entry !== undefined,
+            warningMessage: entry ? undefined : 'This DCK file does not include a BASIC AROS program.',
+          })
+          return null
+        }
+
+        const uploaded = importDockFileEntry(bytes, entry.id)
+        setImportedProgramFileEditContext(bytes, file.name, entry, 'dck', uploaded.source)
+        return { ...uploaded, autostartLineInitialized: true }
+      }
+
+      if (lowerFileName.endsWith('.p')) {
         if (dialect !== 'zx81') {
           throw new Error('P file upload is supported in ZX81 mode.')
         }
 
-        clearImportedTapEdit()
+        clearImportedProgramFileEdit()
         const uploaded = importPFile(new Uint8Array(await file.arrayBuffer()))
         return {
           programName: null,
@@ -153,7 +201,7 @@ export function useProgramFiles({
         }
       }
 
-      clearImportedTapEdit()
+      clearImportedProgramFileEdit()
       return {
         programName: null,
         source: await file.text(),
@@ -164,65 +212,73 @@ export function useProgramFiles({
       throw new Error('TAP upload is supported in ZX Spectrum and TS2068 modes.')
     }
 
+    onProgramExportFormatChange('tap')
     const bytes = new Uint8Array(await file.arrayBuffer())
     const entries = listTapFileEntries(bytes)
-    if (entries.length > 1) {
-      clearImportedTapEdit()
-      setPendingTapUpload({ bytes, entries, fileName: file.name })
+    const entry = entries.find((programFileEntry) => programFileEntry.loadable)
+    if (entries.length > 1 || !entry) {
+      clearImportedProgramFileEdit()
+      setPendingProgramFileUpload({
+        bytes,
+        confirmLabel: entry ? undefined : 'OK',
+        entries,
+        fileName: file.name,
+        format: 'tap',
+        formatName: 'TAP',
+        showFileName: entry !== undefined,
+        warningMessage: entry ? undefined : 'This TAP file does not include a BASIC program.',
+      })
       return null
     }
 
-    const entry = entries.find((tapEntry) => tapEntry.loadable)
-    if (!entry) {
-      clearImportedTapEdit()
-      throw new Error('Unable to find a BASIC program in this TAP file.')
-    }
-
     const uploaded = importTapFileEntry(bytes, dialect, entry.id)
-    setImportedTapEditContext(bytes, file.name, entry)
+    setImportedProgramFileEditContext(bytes, file.name, entry, 'tap', uploaded.source)
     return { ...uploaded, autostartLineInitialized: true }
   }
 
-  async function handleConfirmTapSelection(entryId: number): Promise<void> {
-    const pendingUpload = pendingTapUpload
+  async function handleConfirmProgramFileSelection(entryId: number): Promise<void> {
+    const pendingUpload = pendingProgramFileUpload
     if (!pendingUpload) {
       return
     }
 
-    setPendingTapUpload(null)
+    setPendingProgramFileUpload(null)
     onProcessingStart()
 
     try {
-      const uploaded = importTapFileEntry(pendingUpload.bytes, dialect, entryId)
-      const entry = pendingUpload.entries.find((tapEntry) => tapEntry.id === entryId)
+      const uploaded = pendingUpload.format === 'dck' ? importDockFileEntry(pendingUpload.bytes, entryId) : importTapFileEntry(pendingUpload.bytes, dialect, entryId)
+      const entry = pendingUpload.entries.find((programFileEntry) => programFileEntry.id === entryId)
       if (entry) {
-        setImportedTapEditContext(pendingUpload.bytes, pendingUpload.fileName, entry)
+        setImportedProgramFileEditContext(pendingUpload.bytes, pendingUpload.fileName, entry, pendingUpload.format, uploaded.source)
       }
       loadUploadedSource(uploaded.source, normalizeUploadedProgramName(uploaded.programName ?? fileStem(pendingUpload.fileName), dialect), { updateAutostartLine: false })
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to load TAP entry.')
+      onError(error instanceof Error ? error.message : `Unable to load ${pendingUpload.formatName} entry.`)
       onProcessingEnd()
     }
   }
 
-  function handleCancelTapSelection(): void {
-    setPendingTapUpload(null)
+  function handleCancelProgramFileSelection(): void {
+    setPendingProgramFileUpload(null)
   }
 
-  function setImportedTapEditContext(bytes: Uint8Array, fileName: string, entry: TapFileEntry): void {
-    setImportedTapEdit({ bytes, entry, fileName })
-    setUpdateImportedTapEnabled(true)
+  function setImportedProgramFileEditContext(bytes: Uint8Array, fileName: string, entry: ProgramFileEntry, format: ImportedProgramFormat, uploadedSource: string): void {
+    setImportedProgramFileEdit({ bytes, entry, fileName, format })
+    setUpdateImportedProgramFileEnabled(true)
     if (entry.autostartLine !== null) {
       setAutostartEnabled(true)
       setAutostartLine(String(entry.autostartLine))
+    } else if (entry.autostart) {
+      setAutostartEnabled(true)
+      setAutostartLine(firstBasicLineNumberText(uploadedSource) ?? fallbackAutostartLine)
     } else {
       setAutostartEnabled(false)
     }
   }
 
-  function clearImportedTapEdit(): void {
-    setImportedTapEdit(null)
-    setUpdateImportedTapEnabled(false)
+  function clearImportedProgramFileEdit(): void {
+    setImportedProgramFileEdit(null)
+    setUpdateImportedProgramFileEnabled(false)
   }
 
   function loadUploadedSource(uploadedSource: string, uploadedProgramName: string, options: LoadUploadedSourceOptions = {}): void {
@@ -248,7 +304,7 @@ export function useProgramFiles({
         },
       ])
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to save source file.')
+      onError(error instanceof Error ? error.message : 'Unable to save source file.')
     } finally {
       onProcessingEnd()
     }
@@ -280,11 +336,11 @@ export function useProgramFiles({
     }
   }
 
-  async function handleConfirmExport(nextProgramName: string, selectedAutostartLine: number | null, updateImportedTap = false): Promise<void> {
-    const storedTapProgramName = normalizeProgramName(nextProgramName)
-    const downloadProgramName = dialect === 'zx81' || plus3DosExport ? normalizeDownloadProgramName(nextProgramName) : storedTapProgramName
-    const shouldUpdateImportedTap = updateImportedTap && updateImportedTapAvailable && importedTapEdit !== null
-    const downloadFileBaseName = shouldUpdateImportedTap ? fileStem(importedTapEdit.fileName) : downloadProgramName
+  async function handleConfirmExport(nextProgramName: string, selectedAutostartLine: number | null, updateImportedFile = false): Promise<void> {
+    const storedProgramName = normalizeProgramName(nextProgramName)
+    const downloadProgramName = dialect === 'zx81' || plus3DosExport || dockExport ? normalizeDownloadProgramName(nextProgramName) : storedProgramName
+    const shouldUpdateImportedFile = updateImportedFile && updateImportedFileAvailable && importedProgramFileEdit !== null
+    const downloadFileBaseName = shouldUpdateImportedFile ? fileStem(importedProgramFileEdit.fileName) : downloadProgramName
     setIsExportDialogOpen(false)
     setProgramName(downloadProgramName)
     onProcessingStart()
@@ -296,27 +352,31 @@ export function useProgramFiles({
           ? createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
           : plus3DosExport
             ? createPlus3DosFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
-          : shouldUpdateImportedTap
+          : dockExport
+            ? shouldUpdateImportedFile && importedProgramFileEdit.format === 'dck'
+              ? updateDockFileProgramEntry(importedProgramFileEdit.bytes, result.ast, result.tokens, { autostart: selectedAutostartLine !== null, blockIndex: importedProgramFileEdit.entry.blockIndex })
+              : createDockFile(result.ast, result.tokens, { autostart: selectedAutostartLine !== null })
+          : shouldUpdateImportedFile
             ? updateTapFileProgramEntry(
-                importedTapEdit.bytes,
+                importedProgramFileEdit.bytes,
                 result.ast,
                 result.tokens,
                 selectedAutostartLine === null
-                  ? { blockIndex: importedTapEdit.entry.blockIndex, filename: storedTapProgramName }
-                  : { autostartLine: selectedAutostartLine, blockIndex: importedTapEdit.entry.blockIndex, filename: storedTapProgramName },
+                  ? { blockIndex: importedProgramFileEdit.entry.blockIndex, filename: storedProgramName }
+                  : { autostartLine: selectedAutostartLine, blockIndex: importedProgramFileEdit.entry.blockIndex, filename: storedProgramName },
               )
             : createTapFile(
                 result.ast,
                 result.tokens,
-                selectedAutostartLine === null ? { filename: storedTapProgramName } : { filename: storedTapProgramName, autostartLine: selectedAutostartLine },
+                selectedAutostartLine === null ? { filename: storedProgramName } : { filename: storedProgramName, autostartLine: selectedAutostartLine },
               )
       const outputBuffer = new ArrayBuffer(output.byteLength)
       new Uint8Array(outputBuffer).set(output)
       const blob = new Blob([outputBuffer], { type: programFileMimeType })
-      const extension = programFileExtension(dialect, spectrumExportFormat)
+      const extension = programFileExtension(dialect, programExportFormat)
       await saveFile(blob, `${downloadBaseName(downloadFileBaseName)}${extension}`, [
         {
-          description: programFileDescription(dialect, spectrumExportFormat),
+          description: programFileDescription(dialect, programExportFormat),
           accept: {
             [programFileMimeType]: [extension],
           },
@@ -325,7 +385,7 @@ export function useProgramFiles({
       onRequestParse()
     } catch (error) {
       onRequestParse()
-      window.alert(error instanceof Error ? error.message : 'Unable to export program file.')
+      onError(error instanceof Error ? error.message : 'Unable to export program file.')
     } finally {
       onProcessingEnd()
     }
@@ -348,39 +408,55 @@ export function useProgramFiles({
   return {
     autostartEnabled,
     autostartLine: autostartEnabled ? autostartLine : defaultAutostartLine,
-    updateImportedTapAvailable,
-    updateImportedTapEnabled,
-    clearImportedTapEdit,
+    updateImportedFileAvailable,
+    updateImportedFileEnabled: updateImportedProgramFileEnabled,
+    updateImportedFileFormatName,
+    clearImportedProgramFileEdit,
     handleAutostartEnabledChange,
-    handleCancelTapSelection,
+    handleCancelProgramFileSelection,
     handleConfirmExport,
-    handleConfirmTapSelection,
+    handleConfirmProgramFileSelection,
     handleOpenExportDialog,
     handleSaveSource,
     handleUploadSource,
     isExportDialogOpen,
-    pendingTapSelection: pendingTapUpload ? { entries: pendingTapUpload.entries, fileName: pendingTapUpload.fileName } : null,
+    pendingProgramFileSelection: pendingProgramFileUpload
+      ? {
+          confirmLabel: pendingProgramFileUpload.confirmLabel,
+          entries: pendingProgramFileUpload.entries,
+          fileName: pendingProgramFileUpload.fileName,
+          formatName: pendingProgramFileUpload.formatName,
+          showFileName: pendingProgramFileUpload.showFileName,
+          warningMessage: pendingProgramFileUpload.warningMessage,
+        }
+      : null,
     programName,
     setAutostartLine,
-    setUpdateImportedTapEnabled,
+    setUpdateImportedProgramFileEnabled,
     setIsExportDialogOpen,
     setProgramName,
     updateDefaultAutostartLine,
   }
 }
 
-type PendingTapUpload = PendingTapSelection & {
+type ImportedProgramFormat = 'tap' | 'dck'
+
+type PendingProgramFileUpload = PendingProgramFileSelection & {
   readonly bytes: Uint8Array
+  readonly format: ImportedProgramFormat
 }
 
-type ImportedTapEdit = {
+type ImportedProgramEdit = {
   readonly bytes: Uint8Array
-  readonly entry: TapFileEntry
+  readonly entry: ProgramFileEntry
+  readonly format: ImportedProgramFormat
   readonly fileName: string
 }
 
-type UploadedProgram = ImportedTapProgram & {
+type UploadedProgram = {
   readonly autostartLineInitialized?: boolean
+  readonly programName: string | null
+  readonly source: string
 }
 
 type LoadUploadedSourceOptions = {
