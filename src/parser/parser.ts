@@ -1370,7 +1370,7 @@ export class Parser {
     }
 
     if (this.shouldParseSystemFunctionCall()) {
-      return this.parseSystemFunctionCall()
+      return this.parseSystemFunctionOrLowercaseVariable()
     }
 
     if (this.isUnsupportedExpressionKeyword(this.current().kind)) {
@@ -1466,6 +1466,22 @@ export class Parser {
       name: stringValue(name),
       args,
       span: joinSpans(start.span, end.span),
+    }
+  }
+
+  private parseSystemFunctionOrLowercaseVariable(): ExpressionNode {
+    const start = this.current()
+    const startCursor = this.cursor
+
+    try {
+      return this.parseSystemFunctionCall()
+    } catch (error) {
+      if (!(error instanceof ZxBasicSyntaxError) || !this.isLowercaseContextualVariableToken(start)) {
+        throw error
+      }
+
+      this.cursor = startCursor
+      return this.parseVariable({ allowSpacedNumericName: true })
     }
   }
 
@@ -1832,6 +1848,10 @@ export class Parser {
     }
 
     return this.dialect === 'spectrum' && ts2068OnlyExpressionKeywordKinds.has(kind)
+  }
+
+  private isLowercaseContextualVariableToken(token: Token): boolean {
+    return this.isVariableNameStart(token.kind) && /[a-z]/.test(token.lexeme)
   }
 
   private dialectLabel(): string {

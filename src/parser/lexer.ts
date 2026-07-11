@@ -449,7 +449,7 @@ function matchKeyword(lineText: string, index: number, dialect: BasicDialect, ex
     }
     const previous = index === 0 ? '' : lineText[index - 1]
     const next = lineText[index + keyword.text.length] ?? ''
-    if (isIdentifierPart(previous) || previous === '$') {
+    if (isIdentifierPart(previous)) {
       continue
     }
     if (requiresRightBoundary(keyword.text) && (isIdentifierPart(next) || next === '$')) {
