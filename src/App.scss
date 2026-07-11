@@ -619,6 +619,12 @@
   width: 34px;
 }
 
+.alert-dialog-message {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .tap-selection-file-name {
   margin-bottom: 12px;
   overflow: hidden;

@@ -28,6 +28,7 @@ type SourcePanelProps = {
   readonly onFormatSource: () => void
   readonly onGotoError: () => void
   readonly onGotoLine: (lineNumber: number) => void
+  readonly onError: (message: string) => void
 }
 
 export function SourcePanel({
@@ -46,6 +47,7 @@ export function SourcePanel({
   onFormatSource,
   onGotoError,
   onGotoLine,
+  onError,
 }: SourcePanelProps) {
   const editorRef = useRef<SourceCodeEditorHandle | null>(null)
   const sourcePropRef = useRef(source)
@@ -102,7 +104,7 @@ export function SourcePanel({
     try {
       await navigator.clipboard.writeText(selectedText)
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to copy source.')
+      onError(error instanceof Error ? error.message : 'Unable to copy source.')
     }
   }
 
@@ -111,7 +113,7 @@ export function SourcePanel({
       const pastedText = await navigator.clipboard.readText()
       replaceSourceSelection(pastedText)
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to paste source.')
+      onError(error instanceof Error ? error.message : 'Unable to paste source.')
     }
   }
 

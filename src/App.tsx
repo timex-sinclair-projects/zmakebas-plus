@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Collapse from 'react-bootstrap/Collapse'
 import Container from 'react-bootstrap/Container'
 import './App.scss'
+import { AlertDialog } from './components/AlertDialog'
 import { ExportDialog } from './components/ExportDialog'
 import { ParserHeader } from './components/ParserHeader'
 import { ParserOptionsPane } from './components/ParserOptionsPane'
@@ -60,6 +61,7 @@ function App() {
   const [spectrumExportFormat, setSpectrumExportFormat] = usePreference('spectrumExportFormat')
   const [formatterKeywordCase, setFormatterKeywordCase] = usePreference('formatterKeywordCase')
   const [optionsSectionCollapsed, setOptionsSectionCollapsed] = usePreference('optionsSectionCollapsed')
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
@@ -74,7 +76,9 @@ function App() {
     validAutostartLines,
     onProcessingEnd: stopProcessing,
     onProcessingStart: startProcessing,
+    onError: setAlertMessage,
     onRequestParse: requestParse,
+    onSpectrumExportFormatChange: setSpectrumExportFormat,
     onSourceLoaded: (nextSource) => {
       commitSource(nextSource, {
         clearNavigationAfterCommit: true,
@@ -238,6 +242,9 @@ function App() {
       startProcessing()
     }
     programFiles.clearImportedTapEdit()
+    if ((nextDialect === 'spectrum' && spectrumExportFormat === 'dck') || (nextDialect === 'ts2068' && spectrumExportFormat === 'plus3dos')) {
+      setSpectrumExportFormat('tap')
+    }
     setDialect(nextDialect)
     clearNavigation()
   }
@@ -327,6 +334,7 @@ function App() {
           onCancel={handleCancelReplaceSource}
           onConfirm={handleConfirmReplaceSource}
         />
+        <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
         <ExportDialog
           autostartEnabled={programFiles.autostartEnabled}
           autostartLine={programFiles.autostartLine}
@@ -334,8 +342,9 @@ function App() {
           programName={programFiles.programName}
           show={programFiles.isExportDialogOpen}
           spectrumExportFormat={spectrumExportFormat}
-          updateImportedTapAvailable={programFiles.updateImportedTapAvailable}
-          updateImportedTapEnabled={programFiles.updateImportedTapEnabled}
+          updateImportedFileAvailable={programFiles.updateImportedFileAvailable}
+          updateImportedFileEnabled={programFiles.updateImportedFileEnabled}
+          updateImportedFileFormatName={programFiles.updateImportedFileFormatName}
           validAutostartLines={validAutostartLines}
           onCancel={() => programFiles.setIsExportDialogOpen(false)}
           onAutostartEnabledChange={programFiles.handleAutostartEnabledChange}
@@ -349,6 +358,7 @@ function App() {
         {programFiles.pendingTapSelection ? (
           <TapSelectionDialog
             entries={programFiles.pendingTapSelection.entries}
+            formatName={programFiles.pendingTapSelection.formatName}
             fileName={programFiles.pendingTapSelection.fileName}
             show
             onCancel={programFiles.handleCancelTapSelection}
@@ -424,6 +434,7 @@ function App() {
                 onFormatSource={handleFormatSource}
                 onGotoError={handleGotoError}
                 onGotoLine={handleSourceGotoLine}
+                onError={setAlertMessage}
               />
             )}
           </div>
