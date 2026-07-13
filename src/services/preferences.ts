@@ -173,5 +173,5 @@ function readOptionsSectionCollapsedPreference(value: unknown, defaultValue: Opt
 }
 
 function readProgramExportFormatPreference(value: unknown, defaultValue: ProgramExportFormat): ProgramExportFormat {
-  return value === 'tap' || value === 'plus3dos' || value === 'dck' ? value : defaultValue
+  return value === 'tap' || value === 'wav' || value === 'plus3dos' || value === 'dck' ? value : defaultValue
 }

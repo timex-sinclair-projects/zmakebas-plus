@@ -242,7 +242,11 @@ function App() {
       startProcessing()
     }
     programFiles.clearImportedProgramFileEdit()
-    if ((nextDialect === 'spectrum' && programExportFormat === 'dck') || (nextDialect === 'ts2068' && programExportFormat === 'plus3dos')) {
+    if (
+      (nextDialect === 'spectrum' && programExportFormat === 'dck') ||
+      (nextDialect === 'ts2068' && programExportFormat === 'plus3dos') ||
+      (nextDialect === 'zx81' && (programExportFormat === 'plus3dos' || programExportFormat === 'dck'))
+    ) {
       setProgramExportFormat('tap')
     }
     setDialect(nextDialect)

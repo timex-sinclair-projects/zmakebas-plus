@@ -20,12 +20,18 @@ const targetDialectOptions: readonly RadioSelectionOption<BasicDialect>[] = [
   { id: 'dialect-zx81', label: 'ZX81', value: 'zx81' },
 ]
 const spectrumProgramExportFormatOptions: readonly RadioSelectionOption<ProgramExportFormat>[] = [
-  { id: 'spectrum-export-tap', label: 'TAP', value: 'tap' },
-  { id: 'spectrum-export-plus3dos', label: '+3DOS', value: 'plus3dos' },
+  { id: 'spectrum-export-tap', label: 'TAP file', value: 'tap' },
+  { id: 'spectrum-export-wav', label: 'WAV file', value: 'wav' },
+  { id: 'spectrum-export-plus3dos', label: '+3DOS file', value: 'plus3dos' },
 ]
 const ts2068ExportFormatOptions: readonly RadioSelectionOption<ProgramExportFormat>[] = [
-  { id: 'ts2068-export-tap', label: 'TAP', value: 'tap' },
-  { id: 'ts2068-export-dck', label: 'DCK', value: 'dck' },
+  { id: 'ts2068-export-tap', label: 'TAP file', value: 'tap' },
+  { id: 'ts2068-export-dck', label: 'DCK file', value: 'dck' },
+  { id: 'ts2068-export-wav', label: 'WAV file', value: 'wav' },
+]
+const zx81ExportFormatOptions: readonly RadioSelectionOption<ProgramExportFormat>[] = [
+  { id: 'zx81-export-p', label: 'P file', value: 'tap' },
+  { id: 'zx81-export-wav', label: 'WAV file', value: 'wav' },
 ]
 const formatterKeywordCaseOptions: readonly RadioSelectionOption<FormatKeywordCase>[] = [
   { id: 'formatter-keyword-case-upper', label: 'UPPERCASE keywords', value: 'upper' },
@@ -139,6 +145,12 @@ export function ParserOptionsPane({
         {dialect === 'ts2068' ? (
           <CollapsibleOptionGroup title="Export" {...sectionProps('export')}>
             <RadioSelection ariaLabel="TS2068 export format" name="ts2068-export-format" options={ts2068ExportFormatOptions} value={programExportFormat} onChange={onProgramExportFormatChange} />
+          </CollapsibleOptionGroup>
+        ) : null}
+
+        {dialect === 'zx81' ? (
+          <CollapsibleOptionGroup title="Export" {...sectionProps('export')}>
+            <RadioSelection ariaLabel="ZX81 export format" name="zx81-export-format" options={zx81ExportFormatOptions} value={programExportFormat} onChange={onProgramExportFormatChange} />
           </CollapsibleOptionGroup>
         ) : null}
 

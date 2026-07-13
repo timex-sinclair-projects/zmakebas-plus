@@ -9,7 +9,7 @@ This project is inspired by [zmakebas](https://github.com/ohnosec/zmakebas), the
 - Validates BASIC as you edit and highlights syntax errors.
 - Supports numbered BASIC listings and label mode.
 - Shows the generated BASIC listing for label-mode programs.
-- Exports Spectrum-family TAP files, ZX Spectrum +3DOS files, and ZX81 P files from the browser.
+- Exports Spectrum-family TAP and WAV files, ZX Spectrum +3DOS files, and ZX81 P and WAV files from the browser.
 - Includes a zmakebas compatible command line tool.
 - Imports Spectrum-family TAP files and ZX81 P files.
 - Runs fully client-side, no backend service is required.
@@ -69,9 +69,9 @@ DATA "Bat"
 
 Choose the target dialect before exporting:
 
-- `Spectrum/Timex` exports a TAP file.
+- `Spectrum/Timex` exports a TAP or WAV file.
 - `Spectrum` with the `+3DOS` export format exports a +3DOS-compatible file.
-- `ZX81` exports a P file.
+- `ZX81` exports a P or WAV file.
 
 The export dialog can optionally set an auto-start line.
 

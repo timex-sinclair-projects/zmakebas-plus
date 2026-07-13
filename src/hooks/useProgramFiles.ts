@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { isDockExport, isPlus3DosExport, programFileDescription, programFileExtension, type ProgramExportFormat } from '../services/programFile'
+import { isDockExport, isPlus3DosExport, isWavExport, programFileDescription, programFileExtension, programFileSaveMimeType, type ProgramExportFormat } from '../services/programFile'
 import {
   createDockFile,
   createPlus3DosFile,
+  createSpectrumWavFile,
   createTapFile,
   createZx81PFile,
+  createZx81WavFile,
   importDockFileEntry,
   importTapFileEntry,
   importPFile,
@@ -22,7 +24,6 @@ import { isSpectrumFamilyDialect } from '../parser/dialects'
 
 const defaultProgramName = 'ZXBASIC'
 const fallbackAutostartLine = '10'
-const programFileMimeType = 'application/x-zx-basic'
 const sourceMimeType = 'text/plain'
 
 type SaveFilePickerWindow = Window & {
@@ -122,10 +123,12 @@ export function useProgramFiles({
   const defaultAutostartLine = defaultAutostartLineText(validAutostartLines, source, labelModeEnabled, labelStartLine)
   const plus3DosExport = isPlus3DosExport(dialect, programExportFormat)
   const dockExport = isDockExport(dialect, programExportFormat)
+  const wavExport = isWavExport(dialect, programExportFormat)
   const updateImportedFileAvailable =
     importedProgramFileEdit !== null &&
     isSpectrumFamilyDialect(dialect) &&
     !plus3DosExport &&
+    !wavExport &&
     ((importedProgramFileEdit.format === 'tap' && !dockExport) || (importedProgramFileEdit.format === 'dck' && dockExport))
   const updateImportedFileFormatName = importedProgramFileEdit?.format === 'dck' ? 'DCK' : 'TAP'
 
@@ -349,7 +352,17 @@ export function useProgramFiles({
       const { result } = parseProgramForExport(source)
       const output =
         dialect === 'zx81'
-          ? createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
+          ? wavExport
+            ? createZx81WavFile(createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine }), downloadProgramName)
+            : createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
+          : wavExport
+            ? createSpectrumWavFile(
+                createTapFile(
+                  result.ast,
+                  result.tokens,
+                  selectedAutostartLine === null ? { filename: storedProgramName } : { filename: storedProgramName, autostartLine: selectedAutostartLine },
+                ),
+              )
           : plus3DosExport
             ? createPlus3DosFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
           : dockExport
@@ -372,13 +385,14 @@ export function useProgramFiles({
               )
       const outputBuffer = new ArrayBuffer(output.byteLength)
       new Uint8Array(outputBuffer).set(output)
-      const blob = new Blob([outputBuffer], { type: programFileMimeType })
+      const mimeType = programFileSaveMimeType(dialect, programExportFormat)
+      const blob = new Blob([outputBuffer], { type: mimeType })
       const extension = programFileExtension(dialect, programExportFormat)
       await saveFile(blob, `${downloadBaseName(downloadFileBaseName)}${extension}`, [
         {
           description: programFileDescription(dialect, programExportFormat),
           accept: {
-            [programFileMimeType]: [extension],
+            [mimeType]: [extension],
           },
         },
       ])
