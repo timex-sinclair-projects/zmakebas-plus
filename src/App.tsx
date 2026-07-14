@@ -18,6 +18,7 @@ import { useProgramFiles } from './hooks/useProgramFiles'
 import { useZxBasicParser } from './hooks/useZxBasicParser'
 import type { BasicDialect, BasicExtension, LabelSourceMap } from './parser'
 import { formatBasicSource } from './services/formatBasicSource'
+import { renumberBasicSource } from './services/renumberBasicSource'
 import { isBuiltInSampleProgram, normalizeSampleSource, sampleProgramForDialect } from './services/sampleProgram'
 
 function App() {
@@ -173,6 +174,28 @@ function App() {
       requestParseAfterCommit: true,
       startProcessingBeforeCommit: true,
     })
+  }
+
+  function handleRenumberSource(): void {
+    if (!parseState.ok || hasUnparsedDraft) {
+      return
+    }
+
+    try {
+      const renumberedSource = renumberBasicSource(sourceDraftRef.current, {
+        ast: parseState.ast,
+        labelIncrement,
+        labelStartLine,
+        sourceMap,
+      })
+      commitSource(renumberedSource, {
+        clearNavigationAfterCommit: true,
+        requestParseAfterCommit: true,
+        startProcessingBeforeCommit: true,
+      })
+    } catch (error) {
+      setAlertMessage(error instanceof Error ? error.message : 'Unable to renumber source.')
+    }
   }
 
   function handleOpenExportDialog(): void {
@@ -435,6 +458,7 @@ function App() {
                 screenWidth={screenWidth}
                 screenWrapHintsEnabled={screenWrapHintsEnabled}
                 showLineNumbers={labelModeEnabled}
+                canRenumberSource={parseState.ok && !hasUnparsedDraft}
                 onSourceDraftChange={(nextSource) => {
                   sourceDraftRef.current = nextSource
                   setHasUnparsedDraft(nextSource !== parsedSource)
@@ -442,6 +466,7 @@ function App() {
                 onSourceChange={handleSourceChange}
                 onCursorChange={setCursorPosition}
                 onFormatSource={handleFormatSource}
+                onRenumberSource={handleRenumberSource}
                 onGotoError={handleGotoError}
                 onGotoLine={handleSourceGotoLine}
                 onError={setAlertMessage}

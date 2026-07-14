@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Button from 'react-bootstrap/Button'
 import Dropdown from 'react-bootstrap/Dropdown'
 import Form from 'react-bootstrap/Form'
-import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsTextLeft, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
+import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsListOl, BsTextLeft, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
 import type { BasicDialect, BasicExtension } from '../parser'
 import { GoToLineControl } from './GoToLineControl'
 import { SourceCodeEditor, type SourceCodeEditorHandle } from './SourceCodeEditor'
@@ -26,9 +26,11 @@ type SourcePanelProps = {
   readonly onSourceChange: (source: string) => void
   readonly onCursorChange: (position: SourceCursorPosition) => void
   readonly onFormatSource: () => void
+  readonly onRenumberSource: () => void
   readonly onGotoError: () => void
   readonly onGotoLine: (lineNumber: number) => void
   readonly onError: (message: string) => void
+  readonly canRenumberSource: boolean
 }
 
 export function SourcePanel({
@@ -45,9 +47,11 @@ export function SourcePanel({
   onSourceChange,
   onCursorChange,
   onFormatSource,
+  onRenumberSource,
   onGotoError,
   onGotoLine,
   onError,
+  canRenumberSource,
 }: SourcePanelProps) {
   const editorRef = useRef<SourceCodeEditorHandle | null>(null)
   const sourcePropRef = useRef(source)
@@ -185,6 +189,10 @@ export function SourcePanel({
               <Dropdown.Item onClick={onFormatSource}>
                 <BsTextLeft aria-hidden="true" />
                 Format all
+              </Dropdown.Item>
+              <Dropdown.Item disabled={!canRenumberSource} onClick={onRenumberSource}>
+                <BsListOl aria-hidden="true" />
+                Renumber
               </Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item disabled={!canZoomIn} onClick={handleZoomIn}>

@@ -824,6 +824,15 @@
         flex: 0 0 auto;
         color: var(--focus);
       }
+
+      &.disabled,
+      &:disabled {
+        color: var(--bs-dropdown-link-disabled-color);
+
+        svg {
+          color: var(--bs-dropdown-link-disabled-color);
+        }
+      }
     }
   }
 
