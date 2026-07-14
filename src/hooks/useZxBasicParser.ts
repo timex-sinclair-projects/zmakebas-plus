@@ -13,7 +13,7 @@ import {
   type LabelSourceMap,
 } from '../parser'
 import type { SourcePosition, SourceSpan } from '../parser/tokens'
-import { sampleProgram } from '../services/sampleProgram'
+import { sampleProgramForDialect } from '../services/sampleProgram'
 
 export const defaultLabelStartLine = 10
 export const defaultLabelIncrement = 2
@@ -68,7 +68,8 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
   const [automaticParsingEnabled, setAutomaticParsingEnabled] = usePreference('automaticParsingEnabled')
   const [dialect, setDialect] = usePreference('dialect')
   const [spectranetEnabled, setSpectranetEnabled] = usePreference('spectranetEnabled')
-  const [source, setSource] = useState(sampleProgram)
+  const initialSource = sampleProgramForDialect(dialect)
+  const [source, setSource] = useState(initialSource)
   const [labelModeEnabled, setLabelModeEnabled] = usePreference('labelModeEnabled')
   const [labelStartLine, setLabelStartLine] = usePreference('labelStartLine')
   const [labelIncrement, setLabelIncrement] = usePreference('labelIncrement')
@@ -80,7 +81,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
         labelIncrement,
         labelModeEnabled,
         labelStartLine,
-        source: sampleProgram,
+        source: initialSource,
       },
       0,
     ),

@@ -15,6 +15,7 @@ export type Zx81WavFileOptions = {
   readonly sampleRate?: number
 }
 
+/** Creates a ZX81 tape WAV file from a ZX81 P file payload. */
 export function createZx81WavFile(pFileBytes: Uint8Array, filename: string, options: Zx81WavFileOptions = {}): Uint8Array {
   const sampleRate = options.sampleRate ?? defaultSampleRate
   validateSampleRate(sampleRate)
@@ -28,6 +29,7 @@ export function createZx81WavFile(pFileBytes: Uint8Array, filename: string, opti
   return output
 }
 
+/** Creates the byte stream that is encoded on a ZX81 tape. */
 export function createZx81TapeBytes(pFileBytes: Uint8Array, filename: string): Uint8Array {
   const nameBytes = encodeZx81TapeFilename(filename)
   const tapeBytes = new Uint8Array(nameBytes.length + pFileBytes.length)

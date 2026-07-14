@@ -18,7 +18,7 @@ import { useProgramFiles } from './hooks/useProgramFiles'
 import { useZxBasicParser } from './hooks/useZxBasicParser'
 import type { BasicDialect, BasicExtension, LabelSourceMap } from './parser'
 import { formatBasicSource } from './services/formatBasicSource'
-import { sampleProgram } from './services/sampleProgram'
+import { isBuiltInSampleProgram, normalizeSampleSource, sampleProgramForDialect } from './services/sampleProgram'
 
 function App() {
   const { isProcessing, startProcessing, stopProcessing } = useBusyIndicator()
@@ -147,7 +147,7 @@ function App() {
 
   function replaceSourceWithoutWarning(action: ReplaceSourceAction | null, uploadFile: File | null = null): void {
     if (action === 'sample') {
-      handleReplaceSource(sampleProgram)
+      handleReplaceSource(sampleProgramForDialect(dialect))
     }
 
     if (action === 'clear') {
@@ -248,6 +248,9 @@ function App() {
       (nextDialect === 'zx81' && (programExportFormat === 'plus3dos' || programExportFormat === 'dck'))
     ) {
       setProgramExportFormat('tap')
+    }
+    if (isBuiltInSampleProgram(sourceDraftRef.current)) {
+      commitSource(sampleProgramForDialect(nextDialect), { clearNavigationAfterCommit: true })
     }
     setDialect(nextDialect)
     clearNavigation()
@@ -494,12 +497,8 @@ function findClosestGeneratedLineForOriginalLine(sourceMap: LabelSourceMap | nul
 }
 
 function shouldWarnBeforeReplacingSource(source: string): boolean {
-  const normalizedSource = normalizeSourceForReplacementWarning(source)
-  return normalizedSource.length > 0 && normalizedSource !== normalizeSourceForReplacementWarning(sampleProgram)
-}
-
-function normalizeSourceForReplacementWarning(source: string): string {
-  return source.replace(/\r\n?/g, '\n').trim()
+  const normalizedSource = normalizeSampleSource(source)
+  return normalizedSource.length > 0 && !isBuiltInSampleProgram(source)
 }
 
 export default App
