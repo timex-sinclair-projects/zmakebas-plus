@@ -1,26 +1,8 @@
-import type { ProgramNode } from './ast'
-import { writeWord } from './exportCommon'
-import type { ProgramFileEntry } from './programFileEntry'
-import { createBasicProgramBytes, detokenizeBasicProgram } from './spectrumBasicProgram'
-import type { Token } from './tokens'
+import type { ProgramFileEntry } from '../common/programFileEntry'
 
 export type DockFileEntry = ProgramFileEntry
 
-export type ImportedDockProgram = {
-  readonly source: string
-  readonly programName: string | null
-}
-
-export type DockEntryUpdateOptions = {
-  readonly blockIndex: number
-  readonly autostart?: boolean
-}
-
-export type DockOptions = {
-  readonly autostart?: boolean
-}
-
-type DockRecord = {
+export type DockRecord = {
   readonly index: number
   readonly offset: number
   readonly endOffset: number
@@ -36,111 +18,30 @@ type DockChunk = {
   readonly bytes: Uint8Array
 }
 
-type DockEntryBlock = {
+export type DockEntryBlock = {
   readonly entry: DockFileEntry
   readonly record: DockRecord
   readonly programAddress: number
   readonly programEndAddress: number
 }
 
-const chunkSize = 0x2000
-const chunkCount = 8
-const dckHeaderLength = 9
-const dockBankId = 0x00
-const arosBaseAddress = 0x8000
-const arosHeaderLength = 8
-const arosProgramStartAddress = arosBaseAddress + arosHeaderLength
-const arosLanguageBasic = 0x01
-const arosCartridgeType = 0x02
-const arosAutostartEnabled = 0x01
-const basicProgramTerminator = 0x80
+export const chunkSize = 0x2000
+export const chunkCount = 8
+export const dckHeaderLength = 9
+export const dockBankId = 0x00
+export const arosBaseAddress = 0x8000
+export const arosHeaderLength = 8
+export const arosProgramStartAddress = arosBaseAddress + arosHeaderLength
+export const arosLanguageBasic = 0x01
+export const arosCartridgeType = 0x02
+export const arosAutostartEnabled = 0x01
+export const basicProgramTerminator = 0x80
 
-export function listDockFileEntries(bytes: Uint8Array): DockFileEntry[] {
-  return parseDockEntries(bytes).map(({ entry }) => entry)
-}
-
-export function importDockFileEntry(bytes: Uint8Array, entryId: number): ImportedDockProgram {
-  const entry = parseDockEntries(bytes).find(({ entry }) => entry.id === entryId)
-  if (!entry) {
-    throw new Error('Unable to find the selected DCK entry.')
-  }
-
-  if (!entry.entry.loadable) {
-    throw new Error(`DCK entry "${entry.entry.name ?? 'unnamed'}" is ${entry.entry.typeLabel}, not a BASIC AROS program.`)
-  }
-
-  const programBytes = readMemoryRange(entry.record, entry.programAddress, entry.programEndAddress)
-  return {
-    programName: null,
-    source: detokenizeBasicProgram(programBytes, 'ts2068'),
-  }
-}
-
-export function createDockFile(program: ProgramNode, tokens: readonly Token[], options: DockOptions = {}): Uint8Array {
-  const programBytes = createBasicProgramBytes(program, tokens)
-  const memory = new Uint8Array(0x10000).fill(0xff)
-  const endAddress = arosProgramStartAddress + programBytes.length + 1
-  if (endAddress > 0x10000) {
-    throw new Error('Cannot export DCK: BASIC AROS program is too large for the DOCK upper memory bank.')
-  }
-
-  memory.set(createArosHeader(arosProgramStartAddress, usedChunkMask(arosBaseAddress, endAddress), options.autostart ?? false), arosBaseAddress)
-  memory.set(programBytes, arosProgramStartAddress)
-  memory[endAddress - 1] = basicProgramTerminator
-
-  const descriptors = new Array<number>(chunkCount).fill(0)
-  for (let chunk = arosBaseAddress / chunkSize; chunk < Math.ceil(endAddress / chunkSize); chunk += 1) {
-    descriptors[chunk] = 0x02
-  }
-
-  return createDockRecord(dockBankId, descriptors, memory)
-}
-
-export function updateDockFileProgramEntry(originalDck: Uint8Array, program: ProgramNode, tokens: readonly Token[], options: DockEntryUpdateOptions): Uint8Array {
-  const records = parseDockRecords(originalDck)
-  const entry = parseDockEntriesFromRecords(records).find(({ entry: dockEntry }) => dockEntry.blockIndex === options.blockIndex)
-
-  if (!entry?.entry.loadable) {
-    throw new Error('Cannot update DCK file: selected entry is not a BASIC AROS program.')
-  }
-
-  const memory = recordMemoryImage(entry.record)
-  const programBytes = createBasicProgramBytes(program, tokens)
-  const endAddress = entry.programAddress + programBytes.length + 1
-  if (endAddress > 0x10000) {
-    throw new Error('Cannot update DCK file: BASIC AROS program is too large for the DOCK upper memory bank.')
-  }
-
-  memory.set(programBytes, entry.programAddress)
-  memory[endAddress - 1] = basicProgramTerminator
-
-  const descriptors = [...entry.record.descriptors]
-  const firstChunk = Math.floor(arosBaseAddress / chunkSize)
-  const lastChunk = Math.ceil(endAddress / chunkSize)
-  for (let chunk = firstChunk; chunk < lastChunk; chunk += 1) {
-    descriptors[chunk] = descriptors[chunk] === 0x03 ? 0x03 : 0x02
-  }
-
-  const arosHeader = readMemoryRange(entry.record, arosBaseAddress, arosBaseAddress + arosHeaderLength)
-  arosHeader[4] &= ~usedChunkMask(arosBaseAddress, endAddress)
-  arosHeader[5] = options.autostart ?? entry.entry.autostart ? arosAutostartEnabled : 0x00
-  memory.set(arosHeader, arosBaseAddress)
-
-  const chunks = records.map((record) => (record.index === entry.record.index ? createDockRecord(record.bank, descriptors, memory) : originalDck.slice(record.offset, record.endOffset)))
-  const output = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0))
-  let offset = 0
-  for (const chunk of chunks) {
-    output.set(chunk, offset)
-    offset += chunk.length
-  }
-  return output
-}
-
-function parseDockEntries(bytes: Uint8Array): DockEntryBlock[] {
+export function parseDockEntries(bytes: Uint8Array): DockEntryBlock[] {
   return parseDockEntriesFromRecords(parseDockRecords(bytes))
 }
 
-function parseDockEntriesFromRecords(records: readonly DockRecord[]): DockEntryBlock[] {
+export function parseDockEntriesFromRecords(records: readonly DockRecord[]): DockEntryBlock[] {
   const entries: DockEntryBlock[] = []
 
   for (const record of records) {
@@ -238,7 +139,7 @@ function chunkDescriptorLabel(descriptor: number): string {
   }
 }
 
-function parseDockRecords(bytes: Uint8Array): DockRecord[] {
+export function parseDockRecords(bytes: Uint8Array): DockRecord[] {
   const records: DockRecord[] = []
   let offset = 0
 
@@ -314,7 +215,7 @@ function findBasicProgramEndAddress(record: DockRecord, startAddress: number): n
   return null
 }
 
-function recordMemoryImage(record: DockRecord): Uint8Array {
+export function recordMemoryImage(record: DockRecord): Uint8Array {
   const memory = new Uint8Array(0x10000).fill(0xff)
   for (const chunk of record.chunks) {
     if (chunk.offset !== null) {
@@ -324,7 +225,7 @@ function recordMemoryImage(record: DockRecord): Uint8Array {
   return memory
 }
 
-function readMemoryRange(record: DockRecord, startAddress: number, endAddress: number): Uint8Array {
+export function readMemoryRange(record: DockRecord, startAddress: number, endAddress: number): Uint8Array {
   const range = readMemoryRangeOrNull(record, startAddress, endAddress)
   if (!range) {
     throw new Error('Invalid DCK file: selected BASIC AROS program spans missing chunk data.')
@@ -354,46 +255,6 @@ function readMemoryByte(record: DockRecord, address: number): number | null {
     return null
   }
   return chunk.bytes[address % chunkSize]
-}
-
-function createArosHeader(programStartAddress: number, usedChunks: number, autostart: boolean): Uint8Array {
-  const header = new Uint8Array(arosHeaderLength)
-  header[0] = arosLanguageBasic
-  header[1] = arosCartridgeType
-  writeWord(header, 2, programStartAddress)
-  header[4] = (~usedChunks) & 0xff
-  header[5] = autostart ? arosAutostartEnabled : 0x00
-  return header
-}
-
-function createDockRecord(bank: number, descriptors: readonly number[], memory: Uint8Array): Uint8Array {
-  const payloadChunks: Uint8Array[] = []
-  for (let chunk = 0; chunk < chunkCount; chunk += 1) {
-    if ((descriptors[chunk] & 0x02) !== 0) {
-      payloadChunks.push(memory.slice(chunk * chunkSize, (chunk + 1) * chunkSize))
-    }
-  }
-
-  const output = new Uint8Array(dckHeaderLength + payloadChunks.length * chunkSize)
-  output[0] = bank
-  for (let chunk = 0; chunk < chunkCount; chunk += 1) {
-    output[chunk + 1] = descriptors[chunk] ?? 0x00
-  }
-
-  let offset = dckHeaderLength
-  for (const chunk of payloadChunks) {
-    output.set(chunk, offset)
-    offset += chunk.length
-  }
-  return output
-}
-
-function usedChunkMask(startAddress: number, endAddress: number): number {
-  let mask = 0
-  for (let chunk = Math.floor(startAddress / chunkSize); chunk < Math.ceil(endAddress / chunkSize); chunk += 1) {
-    mask |= 1 << chunk
-  }
-  return mask
 }
 
 function readWord(bytes: Uint8Array, offset: number): number {

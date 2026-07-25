@@ -1,5 +1,5 @@
-import { defaultProgramExportFormat, type ProgramExportFormat } from './programFile'
-import type { FormatKeywordCase } from './formatBasicSource'
+import { defaultProgramExportFormat, type ProgramExportFormat } from '../features/programFiles/programFile'
+import type { FormatKeywordCase } from '../editor/formatBasicSource'
 import { defaultDialect, type BasicDialect } from '../parser/dialects'
 
 const preferenceStorageKey = 'zmakebas.preferences'
@@ -21,6 +21,9 @@ export interface IPreferenceValues {
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
   readonly programExportFormat: ProgramExportFormat
+  readonly zx81CarrierRecoveryEnabled: boolean
+  readonly zx81SignalConditioningEnabled: boolean
+  readonly zx81SignalRestorationEnabled: boolean
 }
 
 export type PreferenceKey = keyof IPreferenceValues
@@ -45,6 +48,9 @@ export const preferenceDefaults: IPreferenceValues = {
   screenWrapHintsEnabled: true,
   spectranetEnabled: false,
   programExportFormat: defaultProgramExportFormat,
+  zx81CarrierRecoveryEnabled: false,
+  zx81SignalConditioningEnabled: false,
+  zx81SignalRestorationEnabled: false,
 }
 
 type StoredPreferences = Partial<IPreferenceValues> & {
@@ -72,6 +78,9 @@ export function loadPreferences(): IPreferenceValues {
     screenWrapHintsEnabled: readBooleanPreference(storedPreferences.screenWrapHintsEnabled, preferenceDefaults.screenWrapHintsEnabled),
     spectranetEnabled: readBooleanPreference(storedPreferences.spectranetEnabled, preferenceDefaults.spectranetEnabled),
     programExportFormat: readProgramExportFormatPreference(storedPreferences.programExportFormat ?? storedPreferences.spectrumExportFormat, preferenceDefaults.programExportFormat),
+    zx81CarrierRecoveryEnabled: readBooleanPreference(storedPreferences.zx81CarrierRecoveryEnabled, preferenceDefaults.zx81CarrierRecoveryEnabled),
+    zx81SignalConditioningEnabled: readBooleanPreference(storedPreferences.zx81SignalConditioningEnabled, preferenceDefaults.zx81SignalConditioningEnabled),
+    zx81SignalRestorationEnabled: readBooleanPreference(storedPreferences.zx81SignalRestorationEnabled, preferenceDefaults.zx81SignalRestorationEnabled),
   }
 }
 

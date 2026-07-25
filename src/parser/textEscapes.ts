@@ -1,5 +1,92 @@
-import { parseSpectrumTextControlEscape } from './exportCommon'
 import { spectrumBlockGraphicBytes, zx81BlockGraphicBytes, zx81InverseCharacterBytes, zx81SingleCharacterEscapes } from './graphicEscapes'
+
+const spectrumDisplayControls = new Map(
+  [
+    ['INK', { byte: 0x10, max: 9 }],
+    ['PAPER', { byte: 0x11, max: 9 }],
+    ['FLASH', { byte: 0x12, max: 1 }],
+    ['BRIGHT', { byte: 0x13, max: 1 }],
+    ['INVERSE', { byte: 0x14, max: 1 }],
+    ['OVER', { byte: 0x15, max: 1 }],
+  ] satisfies Array<readonly [string, { readonly byte: number; readonly max: number }]>,
+)
+
+/** Parses a Spectrum display-control escape into its binary bytes. */
+export function parseSpectrumDisplayControlEscape(text: string): number[] | null {
+  const match = text.trim().match(/^([A-Za-z]+)\s+([0-9]+)$/)
+  if (!match) return null
+
+  const name = match[1].toUpperCase()
+  const control = spectrumDisplayControls.get(name)
+  if (!control) return null
+
+  const value = Number.parseInt(match[2], 10)
+  if (value > control.max) {
+    throw new Error(`${name} control parameter must be from 0 to ${control.max}.`)
+  }
+  return [control.byte, value]
+}
+
+/** Parses a Spectrum text-control escape into its binary bytes. */
+export function parseSpectrumTextControlEscape(text: string): number[] | null {
+  const displayControl = parseSpectrumDisplayControlEscape(text)
+  if (displayControl) return displayControl
+
+  const trimmed = text.trim()
+  if (/^COMMA$/i.test(trimmed)) return [0x06]
+
+  const tabMatch = trimmed.match(/^TAB\s+([0-9]+)$/i)
+  if (tabMatch) {
+    const value = Number.parseInt(tabMatch[1], 10)
+    if (value > 31) throw new Error('TAB control parameter must be from 0 to 31.')
+    return [0x17, value]
+  }
+
+  const atMatch = trimmed.match(/^AT\s+([0-9]+)\s*,\s*([0-9]+)$/i)
+  if (atMatch) {
+    const row = Number.parseInt(atMatch[1], 10)
+    const column = Number.parseInt(atMatch[2], 10)
+    if (row > 23) throw new Error('AT row parameter must be from 0 to 23.')
+    if (column > 31) throw new Error('AT column parameter must be from 0 to 31.')
+    return [0x16, row, column]
+  }
+
+  return null
+}
+
+/** Formats one Spectrum display-control byte pair as source text. */
+export function formatSpectrumDisplayControlEscape(byte: number, parameter: number): string | null {
+  for (const [name, control] of spectrumDisplayControls) {
+    if (byte === control.byte && parameter <= control.max) return `\\{${name} ${parameter}}`
+  }
+  return null
+}
+
+/** Formats a Spectrum text-control byte sequence as source text. */
+export function formatSpectrumTextControlEscape(
+  bytes: Uint8Array,
+  index: number,
+): { readonly consumed: number; readonly source: string } | null {
+  const byte = bytes[index]
+  if (byte === 0x06) return { consumed: 1, source: '\\{COMMA}' }
+
+  if (byte === 0x16 && index + 2 < bytes.length) {
+    const row = bytes[index + 1]
+    const column = bytes[index + 2]
+    if (row <= 23 && column <= 31) return { consumed: 3, source: `\\{AT ${row},${column}}` }
+  }
+
+  if (byte === 0x17 && index + 1 < bytes.length) {
+    const value = bytes[index + 1]
+    if (value <= 31) return { consumed: 2, source: `\\{TAB ${value}}` }
+  }
+
+  if (index + 1 < bytes.length) {
+    const displayControl = formatSpectrumDisplayControlEscape(byte, bytes[index + 1])
+    if (displayControl) return { consumed: 2, source: displayControl }
+  }
+  return null
+}
 
 export type TextEscapeDisplayEffect =
   | {

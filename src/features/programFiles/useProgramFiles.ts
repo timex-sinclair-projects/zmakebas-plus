@@ -1,51 +1,32 @@
-import { useState } from 'react'
-import { isDockExport, isPlus3DosExport, isWavExport, programFileDescription, programFileExtension, programFileSaveMimeType, type ProgramExportFormat } from '../services/programFile'
+import { useEffect, useRef, useState } from 'react'
 import {
-  createDockFile,
-  createPlus3DosFile,
-  createSpectrumWavFile,
-  createTapFile,
-  createZx81PFile,
-  createZx81WavFile,
   importDockFileEntry,
   importTapFileEntry,
-  importPFile,
-  listDockFileEntries,
-  listTapFileEntries,
+  type DecodedZx81Wav,
+  type IZx81WavImportProgress,
+  type ProgramFileEntry,
+} from '../../formats'
+import { waitForBrowserPaint } from '../../services/waitForBrowserPaint'
+import {
   parseZxBasic,
   preprocessLabels,
-  updateDockFileProgramEntry,
-  updateTapFileProgramEntry,
   type BasicDialect,
   type BasicExtension,
-  type ProgramFileEntry,
-} from '../parser'
-import { isSpectrumFamilyDialect } from '../parser/dialects'
+} from '../../parser'
+import { isSpectrumFamilyDialect } from '../../parser/dialects'
+import type { Zx81TapeWorkspace } from '../zx81Tape/model/zx81TapeWorkspace'
+import { createZx81WavProgramCatalog, zx81WavProgramEntryId } from '../zx81Tape/services/zx81WavProgramSelection'
+import { saveFile } from './browserFileSave'
+import { isDockExport, isPlus3DosExport, isWavExport, programFileDescription, programFileExtension, programFileSaveMimeType, type ProgramExportFormat } from './programFile'
+import { createProgramFileOutput } from './programFileExport'
+import { importProgramFile, uploadedZx81WavProgram } from './programFileImport'
+import { defaultAutostartLineText, defaultProgramName, downloadBaseName, fallbackAutostartLine, fileStem, firstBasicLineNumberText, isAbortError, isZx81WavUpload, normalizeDownloadProgramName, normalizeProgramName, normalizeUploadedProgramName, wavImportStageLabel } from './programFileNames'
+import type { ImportedProgramEdit, ImportedProgramFormat, ImportedZx81WavProgramSelection, PendingProgramFileSelection, PendingProgramFileUpload, UploadedProgram, WavImportProgress } from './programFileTypes'
 
-const defaultProgramName = 'ZXBASIC'
-const fallbackAutostartLine = '10'
+export type { PendingProgramFileSelection, WavImportProgress } from './programFileTypes'
+
 const sourceMimeType = 'text/plain'
-
-type SaveFilePickerWindow = Window & {
-  readonly showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFileHandle>
-}
-
-type SaveFilePickerOptions = {
-  readonly suggestedName?: string
-  readonly types?: readonly {
-    readonly description: string
-    readonly accept: Record<string, readonly string[]>
-  }[]
-}
-
-type SaveFileHandle = {
-  readonly createWritable: () => Promise<WritableFile>
-}
-
-type WritableFile = {
-  readonly write: (data: Blob) => Promise<void> | void
-  readonly close: () => Promise<void> | void
-}
+const maximumWavUploadBytes = 128 * 1024 * 1024
 
 type UseProgramFilesOptions = {
   readonly dialect: BasicDialect
@@ -56,37 +37,41 @@ type UseProgramFilesOptions = {
   readonly source: string
   readonly programExportFormat: ProgramExportFormat
   readonly validAutostartLines: readonly number[]
+  readonly zx81CarrierRecoveryEnabled: boolean
+  readonly zx81SignalConditioningEnabled: boolean
+  readonly zx81SignalRestorationEnabled: boolean
   readonly onProcessingEnd: () => void
   readonly onProcessingStart: () => void
   readonly onError: (message: string) => void
   readonly onRequestParse: (source?: string) => void
   readonly onProgramExportFormatChange: (format: ProgramExportFormat) => void
+  readonly onSourceLoadStarted: () => void
   readonly onSourceLoaded: (source: string) => void
+  readonly onZx81TapeWorkspaceLoaded: (workspace: Zx81TapeWorkspace | null, sourceFile?: File | null) => void
 }
 
-export type PendingProgramFileSelection = {
-  readonly confirmLabel?: string
-  readonly entries: readonly ProgramFileEntry[]
-  readonly formatName: string
-  readonly fileName: string
-  readonly showFileName?: boolean
-  readonly warningMessage?: string
+type LoadUploadedSourceOptions = {
+  readonly updateAutostartLine?: boolean
 }
 
 export type ProgramFilesState = {
   readonly autostartEnabled: boolean
   readonly autostartLine: string
+  readonly canSelectAnotherZx81WavProgram: boolean
   readonly updateImportedFileAvailable: boolean
   readonly updateImportedFileEnabled: boolean
   readonly updateImportedFileFormatName: string
   readonly isExportDialogOpen: boolean
   readonly pendingProgramFileSelection: PendingProgramFileSelection | null
   readonly programName: string
+  readonly wavImportProgress: WavImportProgress | null
+  readonly cancelWavImport: () => void
   readonly handleAutostartEnabledChange: (enabled: boolean) => void
   readonly handleCancelProgramFileSelection: () => void
   readonly handleConfirmExport: (programName: string, autostartLine: number | null, updateImportedFile?: boolean) => Promise<void>
   readonly handleConfirmProgramFileSelection: (entryId: number) => Promise<void>
   readonly handleOpenExportDialog: (source?: string) => void
+  readonly handleOpenZx81WavProgramSelection: () => void
   readonly handleSaveSource: () => Promise<void>
   readonly handleUploadSource: (file: File) => Promise<void>
   readonly clearImportedProgramFileEdit: () => void
@@ -94,6 +79,7 @@ export type ProgramFilesState = {
   readonly setUpdateImportedProgramFileEnabled: (enabled: boolean) => void
   readonly setIsExportDialogOpen: (isOpen: boolean) => void
   readonly setProgramName: (programName: string) => void
+  readonly refreshZx81WavProgramSelection: (programs: readonly DecodedZx81Wav[], selectedProgramId: string) => void
   readonly updateDefaultAutostartLine: (source: string) => void
 }
 
@@ -108,10 +94,15 @@ export function useProgramFiles({
   onError,
   onRequestParse,
   onProgramExportFormatChange,
+  onSourceLoadStarted,
   onSourceLoaded,
+  onZx81TapeWorkspaceLoaded,
   source,
   programExportFormat,
   validAutostartLines,
+  zx81CarrierRecoveryEnabled,
+  zx81SignalConditioningEnabled,
+  zx81SignalRestorationEnabled,
 }: UseProgramFilesOptions): ProgramFilesState {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [programName, setProgramName] = useState(defaultProgramName)
@@ -119,7 +110,11 @@ export function useProgramFiles({
   const [autostartLine, setAutostartLine] = useState(firstBasicLineNumberText(source) ?? fallbackAutostartLine)
   const [pendingProgramFileUpload, setPendingProgramFileUpload] = useState<PendingProgramFileUpload | null>(null)
   const [importedProgramFileEdit, setImportedProgramFileEdit] = useState<ImportedProgramEdit | null>(null)
+  const [importedZx81WavProgramSelection, setImportedZx81WavProgramSelection] = useState<ImportedZx81WavProgramSelection | null>(null)
   const [updateImportedProgramFileEnabled, setUpdateImportedProgramFileEnabled] = useState(false)
+  const [wavImportProgress, setWavImportProgress] = useState<WavImportProgress | null>(null)
+  const activeWavImport = useRef<AbortController | null>(null)
+  const uploadInProgress = useRef(false)
   const defaultAutostartLine = defaultAutostartLineText(validAutostartLines, source, labelModeEnabled, labelStartLine)
   const plus3DosExport = isPlus3DosExport(dialect, programExportFormat)
   const dockExport = isDockExport(dialect, programExportFormat)
@@ -132,6 +127,8 @@ export function useProgramFiles({
     ((importedProgramFileEdit.format === 'tap' && !dockExport) || (importedProgramFileEdit.format === 'dck' && dockExport))
   const updateImportedFileFormatName = importedProgramFileEdit?.format === 'dck' ? 'DCK' : 'TAP'
 
+  useEffect(() => () => activeWavImport.current?.abort(), [])
+
   function updateDefaultAutostartLine(nextSource: string): void {
     if (autostartEnabled) {
       return
@@ -141,102 +138,87 @@ export function useProgramFiles({
   }
 
   async function handleUploadSource(file: File): Promise<void> {
+    if (uploadInProgress.current) {
+      onError('A program file is already being loaded.')
+      return
+    }
+    if (isZx81WavUpload(file, dialect) && file.size > maximumWavUploadBytes) {
+      onError('ZX81 WAV upload is limited to 128 MB to protect browser memory.')
+      return
+    }
+
+    const wavUpload = isZx81WavUpload(file, dialect)
+    const wavImportController = wavUpload ? new AbortController() : null
+    if (wavImportController) {
+      activeWavImport.current = wavImportController
+      updateWavImportProgress(file.name, 'Reading WAV', 0)
+    }
+    uploadInProgress.current = true
     onProcessingStart()
 
     try {
-      const uploaded = await readUploadedSource(file)
+      onSourceLoadStarted()
+      if (wavUpload) {
+        // A decoded WAV retains the PCM samples and a large event/bit model. Release
+        // the previous tape pane before allocating its replacement.
+        onZx81TapeWorkspaceLoaded(null)
+      }
+      // Let React clear the old listing and paint the busy state before file I/O or
+      // synchronous decoding starts, regardless of the imported program format.
+      await waitForBrowserPaint()
+
+      const uploaded = await readUploadedSource(file, wavImportController?.signal)
       if (!uploaded) {
-        onProcessingEnd()
         return
       }
 
-      const uploadedSource = uploaded.source
       const uploadedProgramName = normalizeUploadedProgramName(uploaded.programName ?? fileStem(file.name), dialect)
-      loadUploadedSource(uploadedSource, uploadedProgramName, { updateAutostartLine: !uploaded.autostartLineInitialized })
+      onZx81TapeWorkspaceLoaded(uploaded.tapeWorkspace ?? null, uploaded.tapeWorkspace ? file : null)
+      loadUploadedSource(uploaded.source, uploadedProgramName, { updateAutostartLine: !uploaded.autostartLineInitialized })
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Unable to load source file.')
+      if (!isAbortError(error)) {
+        onError(error instanceof Error ? error.message : 'Unable to load source file.')
+      }
+    } finally {
+      if (activeWavImport.current === wavImportController) {
+        activeWavImport.current = null
+        setWavImportProgress(null)
+      }
+      uploadInProgress.current = false
       onProcessingEnd()
     }
   }
 
-  async function readUploadedSource(file: File): Promise<UploadedProgram | null> {
-    const lowerFileName = file.name.toLowerCase()
-    if (!lowerFileName.endsWith('.tap')) {
-      if (lowerFileName.endsWith('.dck')) {
-        if (dialect !== 'ts2068') {
-          throw new Error('DCK upload is supported in TS2068 mode.')
-        }
+  async function readUploadedSource(file: File, wavImportSignal?: AbortSignal): Promise<UploadedProgram | null> {
+    const result = await importProgramFile(file, {
+      dialect,
+      onDecodeProgress: (progress) => updateWavDecodeProgress(file.name, progress),
+      onProgramExportFormatChange,
+      onReadProgress: (fraction) => updateWavImportProgress(file.name, 'Reading WAV', fraction * 10),
+      signalCarrierRecoveryEnabled: zx81CarrierRecoveryEnabled,
+      signalConditioningEnabled: zx81SignalConditioningEnabled,
+      signalRestorationEnabled: zx81SignalRestorationEnabled,
+      wavImportSignal,
+    })
 
-        onProgramExportFormatChange('dck')
-        const bytes = new Uint8Array(await file.arrayBuffer())
-        const entries = listDockFileEntries(bytes)
-        const entry = entries.find((programFileEntry) => programFileEntry.loadable)
-        if (entries.length > 1 || !entry) {
-          clearImportedProgramFileEdit()
-          setPendingProgramFileUpload({
-            bytes,
-            confirmLabel: entry ? undefined : 'OK',
-            entries,
-            fileName: file.name,
-            format: 'dck',
-            formatName: 'DCK',
-            showFileName: entry !== undefined,
-            warningMessage: entry ? undefined : 'This DCK file does not include a BASIC AROS program.',
-          })
-          return null
-        }
-
-        const uploaded = importDockFileEntry(bytes, entry.id)
-        setImportedProgramFileEditContext(bytes, file.name, entry, 'dck', uploaded.source)
-        return { ...uploaded, autostartLineInitialized: true }
-      }
-
-      if (lowerFileName.endsWith('.p')) {
-        if (dialect !== 'zx81') {
-          throw new Error('P file upload is supported in ZX81 mode.')
-        }
-
-        clearImportedProgramFileEdit()
-        const uploaded = importPFile(new Uint8Array(await file.arrayBuffer()))
-        return {
-          programName: null,
-          source: uploaded.source,
-        }
-      }
-
+    if (result.kind === 'selection') {
       clearImportedProgramFileEdit()
-      return {
-        programName: null,
-        source: await file.text(),
-      }
-    }
-
-    if (!isSpectrumFamilyDialect(dialect)) {
-      throw new Error('TAP upload is supported in ZX Spectrum and TS2068 modes.')
-    }
-
-    onProgramExportFormatChange('tap')
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    const entries = listTapFileEntries(bytes)
-    const entry = entries.find((programFileEntry) => programFileEntry.loadable)
-    if (entries.length > 1 || !entry) {
-      clearImportedProgramFileEdit()
-      setPendingProgramFileUpload({
-        bytes,
-        confirmLabel: entry ? undefined : 'OK',
-        entries,
-        fileName: file.name,
-        format: 'tap',
-        formatName: 'TAP',
-        showFileName: entry !== undefined,
-        warningMessage: entry ? undefined : 'This TAP file does not include a BASIC program.',
-      })
+      setPendingProgramFileUpload(result.selection)
       return null
     }
 
-    const uploaded = importTapFileEntry(bytes, dialect, entry.id)
-    setImportedProgramFileEditContext(bytes, file.name, entry, 'tap', uploaded.source)
-    return { ...uploaded, autostartLineInitialized: true }
+    if (result.importedEdit) {
+      setImportedProgramFileEditContext(
+        result.importedEdit.bytes,
+        result.importedEdit.fileName,
+        result.importedEdit.entry,
+        result.importedEdit.format,
+        result.program.source,
+      )
+    } else if (result.clearImportedEdit) {
+      clearImportedProgramFileEdit()
+    }
+    return result.program
   }
 
   async function handleConfirmProgramFileSelection(entryId: number): Promise<void> {
@@ -246,9 +228,27 @@ export function useProgramFiles({
     }
 
     setPendingProgramFileUpload(null)
+    if (pendingUpload.format === 'wav' && pendingUpload.initialSelectedEntryId === entryId) {
+      return
+    }
     onProcessingStart()
 
     try {
+      onSourceLoadStarted()
+      await waitForBrowserPaint()
+      if (pendingUpload.format === 'wav') {
+        const decoded = pendingUpload.programs[entryId]
+        if (!decoded) {
+          throw new Error('Unable to find the selected ZX81 WAV program.')
+        }
+        const uploaded = uploadedZx81WavProgram(decoded, pendingUpload.fileName)
+        setImportedZx81WavProgramSelection({ ...pendingUpload, selectedEntryId: entryId })
+        onZx81TapeWorkspaceLoaded(uploaded.tapeWorkspace ?? null, pendingUpload.sourceFile)
+        const uploadedProgramName = normalizeUploadedProgramName(uploaded.programName ?? fileStem(pendingUpload.fileName), dialect)
+        loadUploadedSource(uploaded.source, uploadedProgramName)
+        return
+      }
+
       const uploaded = pendingUpload.format === 'dck' ? importDockFileEntry(pendingUpload.bytes, entryId) : importTapFileEntry(pendingUpload.bytes, dialect, entryId)
       const entry = pendingUpload.entries.find((programFileEntry) => programFileEntry.id === entryId)
       if (entry) {
@@ -257,12 +257,54 @@ export function useProgramFiles({
       loadUploadedSource(uploaded.source, normalizeUploadedProgramName(uploaded.programName ?? fileStem(pendingUpload.fileName), dialect), { updateAutostartLine: false })
     } catch (error) {
       onError(error instanceof Error ? error.message : `Unable to load ${pendingUpload.formatName} entry.`)
+    } finally {
       onProcessingEnd()
     }
   }
 
   function handleCancelProgramFileSelection(): void {
     setPendingProgramFileUpload(null)
+  }
+
+  function cancelWavImport(): void {
+    activeWavImport.current?.abort()
+  }
+
+  function updateWavDecodeProgress(fileName: string, progress: IZx81WavImportProgress): void {
+    updateWavImportProgress(fileName, wavImportStageLabel(progress.stage), 10 + progress.fraction * 90)
+  }
+
+  function updateWavImportProgress(fileName: string, label: string, percent: number): void {
+    const roundedPercent = Math.max(0, Math.min(100, Math.round(percent)))
+    setWavImportProgress((current) => (
+      current?.fileName === fileName && current.label === label && current.percent === roundedPercent
+        ? current
+        : { fileName, label, percent: roundedPercent }
+    ))
+  }
+
+  function handleOpenZx81WavProgramSelection(): void {
+    if (!importedZx81WavProgramSelection) return
+    setPendingProgramFileUpload({
+      ...importedZx81WavProgramSelection,
+      initialSelectedEntryId: importedZx81WavProgramSelection.selectedEntryId,
+      warningMessage: 'Loading a different entry replaces the current BASIC source and waveform edits.',
+    })
+  }
+
+  function refreshZx81WavProgramSelection(programs: readonly DecodedZx81Wav[], selectedProgramId: string): void {
+    setImportedZx81WavProgramSelection((currentSelection) => {
+      if (!currentSelection) return null
+      const catalog = createZx81WavProgramCatalog(programs)
+      const selectedEntryId = zx81WavProgramEntryId(catalog, selectedProgramId)
+      if (catalog.programs.length < 2 || selectedEntryId === null) return null
+      return {
+        ...currentSelection,
+        entries: catalog.entries,
+        programs: catalog.programs,
+        selectedEntryId,
+      }
+    })
   }
 
   function setImportedProgramFileEditContext(bytes: Uint8Array, fileName: string, entry: ProgramFileEntry, format: ImportedProgramFormat, uploadedSource: string): void {
@@ -281,6 +323,7 @@ export function useProgramFiles({
 
   function clearImportedProgramFileEdit(): void {
     setImportedProgramFileEdit(null)
+    setImportedZx81WavProgramSelection(null)
     setUpdateImportedProgramFileEnabled(false)
   }
 
@@ -350,39 +393,17 @@ export function useProgramFiles({
 
     try {
       const { result } = parseProgramForExport(source)
-      const output =
-        dialect === 'zx81'
-          ? wavExport
-            ? createZx81WavFile(createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine }), downloadProgramName)
-            : createZx81PFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
-          : wavExport
-            ? createSpectrumWavFile(
-                createTapFile(
-                  result.ast,
-                  result.tokens,
-                  selectedAutostartLine === null ? { filename: storedProgramName } : { filename: storedProgramName, autostartLine: selectedAutostartLine },
-                ),
-              )
-          : plus3DosExport
-            ? createPlus3DosFile(result.ast, result.tokens, selectedAutostartLine === null ? undefined : { autostartLine: selectedAutostartLine })
-          : dockExport
-            ? shouldUpdateImportedFile && importedProgramFileEdit.format === 'dck'
-              ? updateDockFileProgramEntry(importedProgramFileEdit.bytes, result.ast, result.tokens, { autostart: selectedAutostartLine !== null, blockIndex: importedProgramFileEdit.entry.blockIndex })
-              : createDockFile(result.ast, result.tokens, { autostart: selectedAutostartLine !== null })
-          : shouldUpdateImportedFile
-            ? updateTapFileProgramEntry(
-                importedProgramFileEdit.bytes,
-                result.ast,
-                result.tokens,
-                selectedAutostartLine === null
-                  ? { blockIndex: importedProgramFileEdit.entry.blockIndex, filename: storedProgramName }
-                  : { autostartLine: selectedAutostartLine, blockIndex: importedProgramFileEdit.entry.blockIndex, filename: storedProgramName },
-              )
-            : createTapFile(
-                result.ast,
-                result.tokens,
-                selectedAutostartLine === null ? { filename: storedProgramName } : { filename: storedProgramName, autostartLine: selectedAutostartLine },
-              )
+      const output = createProgramFileOutput({
+        autostartLine: selectedAutostartLine,
+        dialect,
+        downloadProgramName,
+        importedProgramFileEdit,
+        program: result.ast,
+        programExportFormat,
+        storedProgramName,
+        tokens: result.tokens,
+        updateImportedFile: shouldUpdateImportedFile,
+      })
       const outputBuffer = new ArrayBuffer(output.byteLength)
       new Uint8Array(outputBuffer).set(output)
       const mimeType = programFileSaveMimeType(dialect, programExportFormat)
@@ -422,6 +443,8 @@ export function useProgramFiles({
   return {
     autostartEnabled,
     autostartLine: autostartEnabled ? autostartLine : defaultAutostartLine,
+    cancelWavImport,
+    canSelectAnotherZx81WavProgram: importedZx81WavProgramSelection !== null,
     updateImportedFileAvailable,
     updateImportedFileEnabled: updateImportedProgramFileEnabled,
     updateImportedFileFormatName,
@@ -431,6 +454,7 @@ export function useProgramFiles({
     handleConfirmExport,
     handleConfirmProgramFileSelection,
     handleOpenExportDialog,
+    handleOpenZx81WavProgramSelection,
     handleSaveSource,
     handleUploadSource,
     isExportDialogOpen,
@@ -440,123 +464,19 @@ export function useProgramFiles({
           entries: pendingProgramFileUpload.entries,
           fileName: pendingProgramFileUpload.fileName,
           formatName: pendingProgramFileUpload.formatName,
+          initialSelectedEntryId: pendingProgramFileUpload.initialSelectedEntryId,
           showFileName: pendingProgramFileUpload.showFileName,
           warningMessage: pendingProgramFileUpload.warningMessage,
         }
       : null,
     programName,
+    refreshZx81WavProgramSelection,
     setAutostartLine,
     setUpdateImportedProgramFileEnabled,
     setIsExportDialogOpen,
     setProgramName,
     updateDefaultAutostartLine,
+    wavImportProgress,
   }
 }
 
-type ImportedProgramFormat = 'tap' | 'dck'
-
-type PendingProgramFileUpload = PendingProgramFileSelection & {
-  readonly bytes: Uint8Array
-  readonly format: ImportedProgramFormat
-}
-
-type ImportedProgramEdit = {
-  readonly bytes: Uint8Array
-  readonly entry: ProgramFileEntry
-  readonly format: ImportedProgramFormat
-  readonly fileName: string
-}
-
-type UploadedProgram = {
-  readonly autostartLineInitialized?: boolean
-  readonly programName: string | null
-  readonly source: string
-}
-
-type LoadUploadedSourceOptions = {
-  readonly updateAutostartLine?: boolean
-}
-
-function normalizeProgramName(programName: string): string {
-  const truncated = programName.slice(0, 10)
-  return truncated.trim().length > 0 ? truncated : defaultProgramName
-}
-
-function normalizeUploadedProgramName(programName: string, dialect: BasicDialect): string {
-  return dialect === 'zx81' ? normalizeDownloadProgramName(programName) : normalizeProgramName(programName)
-}
-
-function normalizeDownloadProgramName(programName: string): string {
-  const trimmed = programName.trim()
-  return trimmed.length > 0 ? trimmed : defaultProgramName
-}
-
-function fileStem(fileName: string): string {
-  const lastDot = fileName.lastIndexOf('.')
-  return lastDot > 0 ? fileName.slice(0, lastDot) : fileName
-}
-
-function downloadBaseName(programName: string): string {
-  const cleaned = programName
-    .trim()
-    .replace(/[<>:"/\\|?*]+/g, '_')
-    .split('')
-    .filter((char) => char.charCodeAt(0) >= 32)
-    .join('')
-
-  return cleaned || 'zxbasic'
-}
-
-function firstBasicLineNumberText(source: string): string | null {
-  for (const line of source.split('\n')) {
-    const match = /^\s*(\d+)\b/.exec(line)
-    if (match) {
-      return match[1]
-    }
-  }
-
-  return null
-}
-
-function defaultAutostartLineText(validAutostartLines: readonly number[], source: string, labelModeEnabled: boolean, labelStartLine: number): string {
-  const firstParsedLine = validAutostartLines[0]
-  if (firstParsedLine !== undefined) {
-    return String(firstParsedLine)
-  }
-
-  return labelModeEnabled ? String(labelStartLine) : firstBasicLineNumberText(source) ?? fallbackAutostartLine
-}
-
-async function saveFile(blob: Blob, fileName: string, types: SaveFilePickerOptions['types']): Promise<void> {
-  const showSaveFilePicker = (window as SaveFilePickerWindow).showSaveFilePicker
-
-  if (showSaveFilePicker) {
-    try {
-      const handle = await showSaveFilePicker({
-        suggestedName: fileName,
-        types,
-      })
-      const writable = await handle.createWritable()
-      await writable.write(blob)
-      await writable.close()
-      return
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return
-      }
-    }
-  }
-
-  downloadBlob(blob, fileName)
-}
-
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.append(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}

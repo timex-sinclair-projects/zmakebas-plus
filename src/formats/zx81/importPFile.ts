@@ -1,8 +1,16 @@
-import { type BasicTokenDefinition, zx81TokenDefinitions } from './basicTokens'
-import { zx81BlockGraphicSources, zx81InverseCharacterSources } from './graphicEscapes'
+import { type BasicTokenDefinition, zx81TokenDefinitions } from '../../parser/basicTokens'
+import { zx81BlockGraphicSources, zx81InverseCharacterSources } from '../../parser/graphicEscapes'
 
 export type ImportedPFile = {
+  readonly mappings: readonly ImportedPFileSourceMapping[]
   readonly source: string
+}
+
+export type ImportedPFileSourceMapping = {
+  readonly pFileEnd: number
+  readonly pFileStart: number
+  readonly sourceEnd: number
+  readonly sourceStart: number
 }
 
 type KeywordText = {
@@ -11,40 +19,40 @@ type KeywordText = {
   readonly needsRightPadding?: boolean
 }
 
-const programBaseAddress = 0x407d
-const pFileHeaderLength = 0x74
-const lineEndByte = 0x76
+export const zx81ProgramBaseAddress = 0x407d
+export const zx81PFileHeaderLength = 0x74
+export const zx81LineEndByte = 0x76
 const numberMarker = 0x7e
 
 const tokenTexts = new Map<number, KeywordText>(zx81TokenDefinitions.map((definition) => [definition.byte, zx81KeywordText(definition)]))
 
 export function importPFile(bytes: Uint8Array): ImportedPFile {
   const programBytes = extractProgramBytes(bytes)
-
-  return {
-    source: detokenizeProgram(programBytes),
-  }
+  return detokenizeProgram(programBytes)
 }
 
 function extractProgramBytes(bytes: Uint8Array): Uint8Array {
-  if (bytes.length < pFileHeaderLength) {
+  if (bytes.length < zx81PFileHeaderLength) {
     throw new Error('Invalid ZX81 P file: file is too short to contain a system header.')
   }
 
   const dFileAddress = readWord(bytes, 3)
-  const programLength = dFileAddress - programBaseAddress
-  if (programLength < 0 || pFileHeaderLength + programLength > bytes.length) {
+  const programLength = dFileAddress - zx81ProgramBaseAddress
+  if (programLength < 0 || zx81PFileHeaderLength + programLength > bytes.length) {
     throw new Error('Invalid ZX81 P file: D_FILE pointer does not describe a valid BASIC program area.')
   }
 
-  return bytes.slice(pFileHeaderLength, pFileHeaderLength + programLength)
+  return bytes.slice(zx81PFileHeaderLength, zx81PFileHeaderLength + programLength)
 }
 
-function detokenizeProgram(programBytes: Uint8Array): string {
+function detokenizeProgram(programBytes: Uint8Array): ImportedPFile {
   const lines: string[] = []
+  const mappings: ImportedPFileSourceMapping[] = []
   let offset = 0
+  let sourceOffset = 0
 
   while (offset < programBytes.length) {
+    const lineStart = offset
     if (offset + 4 > programBytes.length) {
       throw new Error('Invalid ZX81 P file: truncated BASIC line header.')
     }
@@ -58,18 +66,27 @@ function detokenizeProgram(programBytes: Uint8Array): string {
     }
 
     const lineBytes = programBytes.subarray(offset, offset + lineLength)
-    if (lineBytes[lineBytes.length - 1] !== lineEndByte) {
+    if (lineBytes[lineBytes.length - 1] !== zx81LineEndByte) {
       throw new Error(`Invalid ZX81 P file: line ${lineNumber} is missing its terminator.`)
     }
 
-    lines.push(`${lineNumber} ${detokenizeLine(lineBytes.subarray(0, lineBytes.length - 1)).trimEnd()}`)
+    const sourceLine = `${lineNumber} ${detokenizeZx81Line(lineBytes.subarray(0, lineBytes.length - 1)).trimEnd()}`
+    lines.push(sourceLine)
     offset += lineLength
+    mappings.push({
+      pFileEnd: zx81PFileHeaderLength + offset,
+      pFileStart: zx81PFileHeaderLength + lineStart,
+      sourceEnd: sourceOffset + sourceLine.length,
+      sourceStart: sourceOffset,
+    })
+    sourceOffset += sourceLine.length + 1
   }
 
-  return lines.join('\n')
+  return { mappings, source: lines.join('\n') }
 }
 
-function detokenizeLine(lineBytes: Uint8Array): string {
+/** Converts one known ZX81 tokenized BASIC line body to source text. */
+export function detokenizeZx81Line(lineBytes: Uint8Array): string {
   let output = ''
   let inString = false
   let justAppendedKeywordPadding = false
@@ -155,10 +172,6 @@ function detokenizeRem(bytes: Uint8Array): string {
   let output = ''
   for (let index = 0; index < bytes.length; index += 1) {
     const byte = bytes[index]
-    if (byte === numberMarker && index + 5 < bytes.length) {
-      index += 5
-      continue
-    }
     output += byteToRemSource(byte, index === bytes.length - 1)
   }
   return output

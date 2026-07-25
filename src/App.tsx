@@ -1,28 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Collapse from 'react-bootstrap/Collapse'
 import Container from 'react-bootstrap/Container'
 import './App.scss'
 import { AlertDialog } from './components/AlertDialog'
-import { ExportDialog } from './components/ExportDialog'
 import { ParserHeader } from './components/ParserHeader'
 import { ParserOptionsPane } from './components/ParserOptionsPane'
 import { ParserResults } from './components/ParserResults'
 import { ParserStatusAlert } from './components/ParserStatusAlert'
 import { ReplaceSourceDialog, type ReplaceSourceAction } from './components/ReplaceSourceDialog'
 import { SourcePanel } from './components/SourcePanel'
-import { ProgramFileSelectionDialog } from './components/ProgramFileSelectionDialog'
-import type { LineNavigationRequest, ParseState, SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest } from './components/types'
+import { formatBasicSource } from './editor/formatBasicSource'
+import { renumberBasicSource } from './editor/renumberBasicSource'
+import type { LineNavigationRequest, ParseState, SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest, SourceRangeNavigationRequest } from './editor/types'
 import { useBusyIndicator } from './hooks/useBusyIndicator'
 import { usePreference } from './hooks/usePreference'
-import { useProgramFiles } from './hooks/useProgramFiles'
+import { ExportDialog } from './features/programFiles/ExportDialog'
+import { ProgramFileSelectionDialog } from './features/programFiles/ProgramFileSelectionDialog'
+import { useProgramFiles, type ProgramFilesState } from './features/programFiles/useProgramFiles'
+import { Zx81WavImportProgress } from './features/programFiles/Zx81WavImportProgress'
+import { Zx81TapePane } from './features/zx81Tape/components/Zx81TapePane'
+import { useZx81TapeController } from './features/zx81Tape/hooks/useZx81TapeController'
 import { useZxBasicParser } from './hooks/useZxBasicParser'
 import type { BasicDialect, BasicExtension, LabelSourceMap } from './parser'
-import { formatBasicSource } from './services/formatBasicSource'
-import { renumberBasicSource } from './services/renumberBasicSource'
 import { isBuiltInSampleProgram, normalizeSampleSource, sampleProgramForDialect } from './services/sampleProgram'
 
 function App() {
   const { isProcessing, startProcessing, stopProcessing } = useBusyIndicator()
+  const startParserProcessing = useCallback(() => startProcessing('parser'), [startProcessing])
+  const stopParserProcessing = useCallback(() => stopProcessing('parser'), [stopProcessing])
+  const startProgramFileProcessing = useCallback(() => startProcessing('program-file'), [startProcessing])
+  const stopProgramFileProcessing = useCallback(() => stopProcessing('program-file'), [stopProcessing])
+  const startResultsProcessing = useCallback(() => startProcessing('results'), [startProcessing])
+  const stopResultsProcessing = useCallback(() => stopProcessing('results'), [stopProcessing])
+  const startTapeRedecodeProcessing = useCallback(() => startProcessing('tape-redecode'), [startProcessing])
+  const stopTapeRedecodeProcessing = useCallback(() => stopProcessing('tape-redecode'), [stopProcessing])
   const {
     automaticParsingEnabled,
     dialect,
@@ -45,18 +56,20 @@ function App() {
     validAutostartLines,
   } = useZxBasicParser({
     isProcessing,
-    onProcessingEnd: stopProcessing,
-    onProcessingStart: startProcessing,
+    onProcessingEnd: stopParserProcessing,
+    onProcessingStart: startParserProcessing,
   })
   const sourceDraftRef = useRef(source)
   const [hasUnparsedDraft, setHasUnparsedDraft] = useState(false)
   const [sourceNavigation, setSourceNavigation] = useState<SourceNavigationRequest | null>(null)
+  const [sourceRangeNavigation, setSourceRangeNavigation] = useState<SourceRangeNavigationRequest | null>(null)
   const [resultsNavigation, setResultsNavigation] = useState<LineNavigationRequest | null>(null)
   const [showResults, setShowResults] = useState(false)
   const [optionsCollapsed, setOptionsCollapsed] = usePreference('optionsCollapsed')
   const [cursorPosition, setCursorPosition] = useState<SourceCursorPosition>({ line: 1, column: 1 })
   const [pendingReplaceSourceAction, setPendingReplaceSourceAction] = useState<ReplaceSourceAction | null>(null)
   const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null)
+  const confirmedReplaceSourceRef = useRef<{ readonly action: ReplaceSourceAction; readonly uploadFile: File | null } | null>(null)
   const [screenWrapHintsEnabled, setScreenWrapHintsEnabled] = usePreference('screenWrapHintsEnabled')
   const [screenWidth, setScreenWidth] = usePreference('screenWidth')
   const [programExportFormat, setProgramExportFormat] = usePreference('programExportFormat')
@@ -66,6 +79,23 @@ function App() {
   const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
+  const programFilesRef = useRef<ProgramFilesState | null>(null)
+  const tapeController = useZx81TapeController({
+    sourceDraftRef,
+    onApplySourceToEditor: (tapeSource) => {
+      commitSource(tapeSource, {
+        clearNavigationAfterCommit: true,
+        requestParseAfterCommit: true,
+        startProcessingBeforeCommit: true,
+      })
+    },
+    onError: setAlertMessage,
+    onProcessingEnd: stopTapeRedecodeProcessing,
+    onProcessingStart: startTapeRedecodeProcessing,
+    onRefreshProgramSelection: (programs, selectedProgramId) => {
+      programFilesRef.current?.refreshZx81WavProgramSelection(programs, selectedProgramId)
+    },
+  })
   const programFiles = useProgramFiles({
     dialect,
     extensions,
@@ -75,11 +105,20 @@ function App() {
     source,
     programExportFormat,
     validAutostartLines,
-    onProcessingEnd: stopProcessing,
-    onProcessingStart: startProcessing,
+    zx81CarrierRecoveryEnabled: tapeController.carrierRecoveryEnabled,
+    zx81SignalConditioningEnabled: tapeController.signalConditioningEnabled,
+    zx81SignalRestorationEnabled: tapeController.signalRestorationEnabled,
+    onProcessingEnd: stopProgramFileProcessing,
+    onProcessingStart: startProgramFileProcessing,
     onError: setAlertMessage,
     onRequestParse: requestParse,
     onProgramExportFormatChange: setProgramExportFormat,
+    onSourceLoadStarted: () => {
+      commitSource('', {
+        clearNavigationAfterCommit: true,
+        updateAutostartLine: false,
+      })
+    },
     onSourceLoaded: (nextSource) => {
       commitSource(nextSource, {
         clearNavigationAfterCommit: true,
@@ -87,7 +126,12 @@ function App() {
         updateAutostartLine: false,
       })
     },
+    onZx81TapeWorkspaceLoaded: tapeController.loadWorkspace,
   })
+
+  useEffect(() => {
+    programFilesRef.current = programFiles
+  }, [programFiles])
 
   useEffect(() => {
     if (sourceDraftRef.current === parsedSource) {
@@ -97,6 +141,7 @@ function App() {
 
   function clearNavigation(): void {
     setSourceNavigation(null)
+    setSourceRangeNavigation(null)
     setResultsNavigation(null)
   }
 
@@ -106,6 +151,7 @@ function App() {
 
   function handleReplaceSource(nextSource: string): void {
     programFiles.clearImportedProgramFileEdit()
+    tapeController.loadWorkspace(null)
     commitSource(nextSource, {
       clearNavigationAfterCommit: true,
       requestParseAfterCommit: true,
@@ -114,6 +160,7 @@ function App() {
   }
 
   function handleRequestReplaceSource(action: ReplaceSourceAction): void {
+    if (tapeController.rejectActionDuringRedecode()) return
     if (!shouldWarnBeforeReplacingSource(sourceDraftRef.current)) {
       replaceSourceWithoutWarning(action)
       return
@@ -123,6 +170,7 @@ function App() {
   }
 
   function handleRequestUploadSource(file: File): void {
+    if (tapeController.rejectActionDuringRedecode()) return
     if (!shouldWarnBeforeReplacingSource(sourceDraftRef.current)) {
       void programFiles.handleUploadSource(file)
       return
@@ -135,15 +183,26 @@ function App() {
   function handleConfirmReplaceSource(): void {
     const action = pendingReplaceSourceAction
     const uploadFile = pendingUploadFile
+    if (action === null) {
+      return
+    }
+    confirmedReplaceSourceRef.current = { action, uploadFile }
     setPendingReplaceSourceAction(null)
     setPendingUploadFile(null)
-
-    replaceSourceWithoutWarning(action, uploadFile)
   }
 
   function handleCancelReplaceSource(): void {
+    confirmedReplaceSourceRef.current = null
     setPendingReplaceSourceAction(null)
     setPendingUploadFile(null)
+  }
+
+  function handleReplaceSourceDialogExited(): void {
+    const confirmedAction = confirmedReplaceSourceRef.current
+    confirmedReplaceSourceRef.current = null
+    if (confirmedAction) {
+      replaceSourceWithoutWarning(confirmedAction.action, confirmedAction.uploadFile)
+    }
   }
 
   function replaceSourceWithoutWarning(action: ReplaceSourceAction | null, uploadFile: File | null = null): void {
@@ -260,11 +319,13 @@ function App() {
     if (nextDialect === dialect) {
       return
     }
+    if (tapeController.rejectActionDuringRedecode()) return
 
     if (automaticParsingEnabled) {
-      startProcessing()
+      startParserProcessing()
     }
     programFiles.clearImportedProgramFileEdit()
+    tapeController.loadWorkspace(null)
     if (
       (nextDialect === 'spectrum' && programExportFormat === 'dck') ||
       (nextDialect === 'ts2068' && programExportFormat === 'plus3dos') ||
@@ -281,7 +342,7 @@ function App() {
 
   function handleLabelModeEnabledChange(nextEnabled: boolean): void {
     if (automaticParsingEnabled) {
-      startProcessing()
+      startParserProcessing()
     }
     setLabelModeEnabled(nextEnabled)
     clearNavigation()
@@ -289,7 +350,7 @@ function App() {
 
   function handleLabelStartLineChange(nextStartLine: number): void {
     if (automaticParsingEnabled) {
-      startProcessing()
+      startParserProcessing()
     }
     setLabelStartLine(nextStartLine)
     clearNavigation()
@@ -297,7 +358,7 @@ function App() {
 
   function handleLabelIncrementChange(nextIncrement: number): void {
     if (automaticParsingEnabled) {
-      startProcessing()
+      startParserProcessing()
     }
     setLabelIncrement(nextIncrement)
     clearNavigation()
@@ -305,7 +366,7 @@ function App() {
 
   function handleSpectranetEnabledChange(nextEnabled: boolean): void {
     if (automaticParsingEnabled) {
-      startProcessing()
+      startParserProcessing()
     }
     setSpectranetEnabled(nextEnabled)
     clearNavigation()
@@ -324,7 +385,7 @@ function App() {
     setHasUnparsedDraft(markDraftParsed || requestParseAfterCommit ? false : nextSource !== parsedSource)
 
     if (startProcessingBeforeCommit) {
-      startProcessing()
+      startParserProcessing()
     }
 
     setSource(nextSource)
@@ -359,10 +420,17 @@ function App() {
           }}
           onDownloadProgram={handleOpenExportDialog}
         />
+        {programFiles.wavImportProgress ? (
+          <Zx81WavImportProgress
+            progress={programFiles.wavImportProgress}
+            onCancel={programFiles.cancelWavImport}
+          />
+        ) : null}
         <ReplaceSourceDialog
           action={pendingReplaceSourceAction}
           onCancel={handleCancelReplaceSource}
           onConfirm={handleConfirmReplaceSource}
+          onExited={handleReplaceSourceDialogExited}
         />
         <AlertDialog message={alertMessage} onClose={() => setAlertMessage(null)} />
         <ExportDialog
@@ -391,6 +459,7 @@ function App() {
             entries={programFiles.pendingProgramFileSelection.entries}
             formatName={programFiles.pendingProgramFileSelection.formatName}
             fileName={programFiles.pendingProgramFileSelection.fileName}
+            initialSelectedEntryId={programFiles.pendingProgramFileSelection.initialSelectedEntryId}
             showFileName={programFiles.pendingProgramFileSelection.showFileName}
             show
             warningMessage={programFiles.pendingProgramFileSelection.warningMessage}
@@ -443,34 +512,66 @@ function App() {
                   labelModeEnabled={labelModeEnabled}
                   navigationRequest={parseState.ok ? resultsNavigation : null}
                   parseState={parseState}
-                  onProcessingStart={startProcessing}
-                  onProcessingEnd={stopProcessing}
+                  onProcessingStart={startResultsProcessing}
+                  onProcessingEnd={stopResultsProcessing}
                 />
               </div>
             ) : (
-              <SourcePanel
-                source={source}
-                dialect={dialect}
-                extensions={extensions}
-                diagnostic={sourceDiagnostic}
-                gotoLineMode={labelModeEnabled ? 'source' : 'basic'}
-                navigationRequest={sourceNavigation}
-                screenWidth={screenWidth}
-                screenWrapHintsEnabled={screenWrapHintsEnabled}
-                showLineNumbers={labelModeEnabled}
-                canRenumberSource={parseState.ok && !hasUnparsedDraft}
-                onSourceDraftChange={(nextSource) => {
-                  sourceDraftRef.current = nextSource
-                  setHasUnparsedDraft(nextSource !== parsedSource)
-                }}
-                onSourceChange={handleSourceChange}
-                onCursorChange={setCursorPosition}
-                onFormatSource={handleFormatSource}
-                onRenumberSource={handleRenumberSource}
-                onGotoError={handleGotoError}
-                onGotoLine={handleSourceGotoLine}
-                onError={setAlertMessage}
-              />
+              <>
+                <SourcePanel
+                  source={source}
+                  dialect={dialect}
+                  extensions={extensions}
+                  diagnostic={sourceDiagnostic}
+                  gotoLineMode={labelModeEnabled ? 'source' : 'basic'}
+                  navigationRequest={sourceNavigation}
+                  rangeNavigationRequest={sourceRangeNavigation}
+                  screenWidth={screenWidth}
+                  screenWrapHintsEnabled={screenWrapHintsEnabled}
+                  showLineNumbers={labelModeEnabled}
+                  canRenumberSource={parseState.ok && !hasUnparsedDraft}
+                  onSourceDraftChange={(nextSource) => {
+                    sourceDraftRef.current = nextSource
+                    setHasUnparsedDraft(nextSource !== parsedSource)
+                  }}
+                  onSourceChange={handleSourceChange}
+                  onCursorChange={setCursorPosition}
+                  onFormatSource={handleFormatSource}
+                  onRenumberSource={handleRenumberSource}
+                  onGotoError={handleGotoError}
+                  onGotoLine={handleSourceGotoLine}
+                  onError={setAlertMessage}
+                />
+                {tapeController.workspace ? (
+                  <Zx81TapePane
+                    key={tapeController.workspace.id}
+                    canSelectProgramEntry={programFiles.canSelectAnotherZx81WavProgram}
+                    carrierRecoveryEnabled={tapeController.carrierRecoveryEnabled}
+                    signalConditioningChangePending={tapeController.signalConditioningChangePending}
+                    signalConditioningEnabled={tapeController.signalConditioningEnabled}
+                    signalRestorationEnabled={tapeController.signalRestorationEnabled}
+                    workspace={tapeController.workspace}
+                    onApplySource={tapeController.applyWorkspaceSourceToEditor}
+                    onCarrierRecoveryEnabledChange={tapeController.handleCarrierRecoveryEnabledChange}
+                    onDeleteBit={tapeController.deleteBit}
+                    onInsertBit={tapeController.insertBit}
+                    onMergeBits={tapeController.mergeBits}
+                    onRevealSourceRange={(start, end) => setSourceRangeNavigation({ id: Date.now(), start, end })}
+                    onRedo={tapeController.redo}
+                    onSelectProgramEntry={() => {
+                      if (!tapeController.rejectActionDuringRedecode()) programFiles.handleOpenZx81WavProgramSelection()
+                    }}
+                    onSetBit={tapeController.setBit}
+                    onSetInsertionValue={tapeController.setInsertionValue}
+                    onSetMergeValue={tapeController.setMergeValue}
+                    onSignalConditioningEnabledChange={tapeController.handleSignalConditioningEnabledChange}
+                    onSignalRestorationEnabledChange={tapeController.handleSignalRestorationEnabledChange}
+                    onSplitBit={tapeController.splitBit}
+                    onResizeInsertion={tapeController.resizeInsertion}
+                    onUndo={tapeController.undo}
+                  />
+                ) : null}
+              </>
             )}
           </div>
         </div>

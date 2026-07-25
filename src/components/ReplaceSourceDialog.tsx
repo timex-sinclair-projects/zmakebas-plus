@@ -7,15 +7,16 @@ type ReplaceSourceDialogProps = {
   readonly action: ReplaceSourceAction | null
   readonly onCancel: () => void
   readonly onConfirm: () => void
+  readonly onExited: () => void
 }
 
-export function ReplaceSourceDialog({ action, onCancel, onConfirm }: ReplaceSourceDialogProps) {
+export function ReplaceSourceDialog({ action, onCancel, onConfirm, onExited }: ReplaceSourceDialogProps) {
   const show = action !== null
   const title = action === 'upload' ? 'Upload program?' : action === 'sample' ? 'Load sample program?' : 'Clear program?'
   const confirmLabel = action === 'upload' ? 'Upload' : action === 'sample' ? 'Load sample' : 'Clear'
 
   return (
-    <Modal show={show} onHide={onCancel} centered>
+    <Modal show={show} onHide={onCancel} onExited={onExited} centered>
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>

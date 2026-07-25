@@ -1,11 +1,11 @@
 import { linter, lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint'
-import { EditorSelection, type EditorState, type Extension } from '@codemirror/state'
+import { EditorSelection, StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import CodeMirror from '@uiw/react-codemirror'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, type CSSProperties } from 'react'
 import { lex, scanStringLiteralDisplayItems, type BasicDialect, type BasicExtension, type Token, type TokenKind } from '../parser'
-import type { SourceCursorPosition, SourceDiagnostic } from './types'
-import { createZxBasicLanguageExtensions } from './zxBasicLanguage'
+import type { SourceCursorPosition, SourceDiagnostic } from '../editor/types'
+import { createZxBasicLanguageExtensions } from '../editor/zxBasicLanguage'
 
 export type SourceCodeEditorHandle = {
   readonly focus: () => void
@@ -30,6 +30,23 @@ type SourceCodeEditorProps = {
   readonly onChange: (value: string) => void
   readonly onCursorChange: (position: SourceCursorPosition) => void
 }
+
+const setTapeSourceHighlight = StateEffect.define<number>()
+const tapeSourceHighlightField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update: (highlights, transaction) => {
+    let nextHighlights = highlights.map(transaction.changes)
+    for (const effect of transaction.effects) {
+      if (effect.is(setTapeSourceHighlight)) {
+        const position = Math.min(Math.max(0, effect.value), transaction.state.doc.length)
+        const line = transaction.state.doc.lineAt(position)
+        nextHighlights = Decoration.set([Decoration.line({ class: 'cm-tape-source-line-highlight' }).range(line.from)])
+      }
+    }
+    return nextHighlights
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
 
 export const SourceCodeEditor = forwardRef<SourceCodeEditorHandle, SourceCodeEditorProps>(function SourceCodeEditor(
   { id, dialect, extensions: basicExtensions, diagnostic, fontSize, screenWidth, screenWrapHintsEnabled, showLineNumbers, value, ariaLabel, onBlur, onChange, onCursorChange },
@@ -112,6 +129,7 @@ export const SourceCodeEditor = forwardRef<SourceCodeEditorHandle, SourceCodeEdi
         cursorPositionRef.current = position
         onCursorChangeRef.current(position)
       }),
+      tapeSourceHighlightField,
       createScreenWrapHintExtension(dialect, basicExtensions, screenWrapHintsEnabled, screenWidth),
       linter(null),
       lintGutter(),
@@ -191,7 +209,10 @@ export const SourceCodeEditor = forwardRef<SourceCodeEditorHandle, SourceCodeEdi
 
         view.dispatch({
           selection: EditorSelection.single(from, to),
-          effects: EditorView.scrollIntoView(from, { y: 'center' }),
+          effects: [
+            EditorView.scrollIntoView(from, { y: 'center' }),
+            setTapeSourceHighlight.of(from),
+          ],
         })
         focus()
       },
