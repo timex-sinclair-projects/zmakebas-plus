@@ -178,7 +178,7 @@ function tokenizeLine(logicalLine: LogicalLine, tokens: Token[], dialect: BasicD
       continue
     }
 
-    if (isNumberStart(lineText, index)) {
+    if (isNumberStart(lineText, index, dialect)) {
       const numberToken = readNumber(lineText, positionAt, index)
       previousSignificantToken = pushToken(tokens, numberToken.token)
       index = numberToken.nextIndex
@@ -346,7 +346,7 @@ function readNumber(lineText: string, positionAt: (index: number) => SourcePosit
 
   const lexeme = lineText.slice(start, index)
   return {
-    token: makeToken('NUMLIT', lexeme, positionAt(start), positionAt(index), Number(lexeme)),
+    token: makeToken('NUMLIT', lexeme, positionAt(start), positionAt(index), Number(lexeme.startsWith('.') ? `0${lexeme}` : lexeme)),
     nextIndex: index,
   }
 }
@@ -518,11 +518,11 @@ function requiresRightBoundary(text: string): boolean {
   return /[A-Z0-9$#]/.test(last)
 }
 
-function isNumberStart(lineText: string, index: number): boolean {
+function isNumberStart(lineText: string, index: number, dialect: BasicDialect): boolean {
   if (isDigit(lineText[index])) {
     return true
   }
-  return lineText[index] === '.' && isDigit(lineText[index + 1] ?? '')
+  return lineText[index] === '.' && (dialect === 'zx81' || isDigit(lineText[index + 1] ?? ''))
 }
 
 function isIdentifierStart(char: string): boolean {

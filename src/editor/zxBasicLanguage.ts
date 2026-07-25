@@ -218,7 +218,8 @@ function createZxBasicStreamParser(dialect: BasicDialect, extensions: readonly B
         return 'string'
       }
 
-      if (stream.match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?/)) {
+      const numberPattern = dialect === 'zx81' ? /^(?:\d+(?:\.\d*)?|\.\d*)(?:[Ee][+-]?\d+)?/ : /^(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?/
+      if (stream.match(numberPattern)) {
         return 'number'
       }
 
