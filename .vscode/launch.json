@@ -2,19 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Server",
+      "name": "Debug",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run dev",
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "Chrome",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/src",
-      "sourceMaps": true
+      "cwd": "${workspaceFolder}",
+      "serverReadyAction": {
+        "action": "debugWithChrome",
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "webRoot": "${workspaceFolder}/src"
+      }
     }
   ]
 }
