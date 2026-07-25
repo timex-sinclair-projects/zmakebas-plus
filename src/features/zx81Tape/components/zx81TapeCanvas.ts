@@ -5,7 +5,6 @@ import type { Zx81TapeWorkspace } from '../model/zx81TapeWorkspace'
 export const tapeCanvasLabelWidth = 72
 export const tapeCanvasLogicalHeight = 264
 const maximumDetailedSamplesPerPixel = 5
-const waveformTrackCenterY = 65
 const waveformDisplayGainCache = new WeakMap<Float32Array, number>()
 
 export type Zx81TapeInsertionRangeDraft = {
@@ -38,7 +37,7 @@ export function drawZx81TapeCanvas(
   context.scale(1, verticalScale)
   context.fillStyle = '#fbfdfb'
   context.fillRect(0, 0, cssWidth, tapeCanvasLogicalHeight)
-  const waveformDisplayGain = getWaveformDisplayGain(workspace.automatic.samples)
+  const waveformDisplayGain = waveformDisplayGainForSamples(workspace.automatic.samples)
 
   context.save()
   context.beginPath()
@@ -59,7 +58,6 @@ export function drawZx81TapeCanvas(
   context.fillText(endLabel, cssWidth - context.measureText(endLabel).width - 4, 13)
   context.restore()
 
-  drawTrackLabels(context, waveformDisplayGain, verticalScale)
 }
 
 function drawSelectedBitMarker(
@@ -97,31 +95,6 @@ export function selectedBitSampleRange(
     endSample: Math.max(...selectedBits.map((bit) => bit.endSample)),
     startSample: Math.min(...selectedBits.map((bit) => bit.startSample)),
   }
-}
-
-function drawTrackLabels(context: CanvasRenderingContext2D, waveformDisplayGain: number, verticalScale: number): void {
-  context.fillStyle = '#edf2ed'
-  context.fillRect(0, 0, tapeCanvasLabelWidth, tapeCanvasLogicalHeight)
-  context.save()
-  context.scale(1, 1 / verticalScale)
-  context.fillStyle = '#526058'
-  context.font = '12px system-ui'
-  const showGain = waveformDisplayGain >= 1.1
-  const [waveformBaseline, gainBaseline] = waveformTrackLabelBaselines(verticalScale, showGain)
-  context.fillText('Waveform', 8, waveformBaseline)
-  if (showGain && gainBaseline !== undefined) {
-    context.fillText(`×${formatDisplayGain(waveformDisplayGain)}`, 8, gainBaseline)
-  }
-  for (const [label, y] of [['Bursts', 124], ['Bits', 151], ['Bytes', 179], ['Decode', 206], ['BASIC', 239]] as const) {
-    context.fillText(label, 8, y * verticalScale)
-  }
-  context.restore()
-}
-
-/** Positions the fixed-size waveform label group around the scaled waveform centre. */
-export function waveformTrackLabelBaselines(verticalScale: number, showGain: boolean): readonly number[] {
-  const centreY = waveformTrackCenterY * verticalScale
-  return showGain ? [centreY - 4, centreY + 10] : [centreY + 3]
 }
 
 function drawWaveform(
@@ -208,7 +181,8 @@ function waveformY(sample: number, displayGain: number): number {
   return 65 - clamp(sample * displayGain, -1, 1) * 42
 }
 
-function getWaveformDisplayGain(samples: Float32Array): number {
+/** Returns a cached display-only gain that makes quiet waveform recordings visible. */
+export function waveformDisplayGainForSamples(samples: Float32Array): number {
   const cached = waveformDisplayGainCache.get(samples)
   if (cached !== undefined) return cached
 
@@ -225,7 +199,8 @@ function getWaveformDisplayGain(samples: Float32Array): number {
   return gain
 }
 
-function formatDisplayGain(gain: number): string {
+/** Formats the waveform display gain without unnecessary decimal places. */
+export function formatWaveformDisplayGain(gain: number): string {
   return String(Math.round(gain))
 }
 

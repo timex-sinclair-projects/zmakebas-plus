@@ -70,6 +70,18 @@ export function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
+/** Leaves the source panel's header visible when sizing the tape pane. */
+export function maximumTapePaneHeight(
+  editorStackHeight: number,
+  sourceHeaderHeight: number,
+  sourcePanelVerticalChrome: number,
+  editorStackGap: number,
+  minimumPaneHeight: number,
+): number {
+  const availableHeight = Math.floor(editorStackHeight - sourceHeaderHeight - sourcePanelVerticalChrome - editorStackGap)
+  return Math.max(minimumPaneHeight, availableHeight)
+}
+
 /** Centres a sample range at a scale that gives its bit block enough width to display its value. */
 export function waveformViewForBit(
   bit: Pick<Zx81TapeWorkspace['effective']['logicalBits'][number], 'endSample' | 'startSample'>,

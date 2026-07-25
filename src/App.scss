@@ -638,10 +638,19 @@
     flex-direction: column;
   }
 
+  .tape-canvas-stage {
+    position: relative;
+    display: flex;
+    min-height: 120px;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
   .tape-canvas {
     display: block;
     width: 100%;
-    min-height: 120px;
+    height: 100%;
+    min-height: 0;
     flex: 1 1 auto;
     cursor: grab;
     touch-action: none;
@@ -667,6 +676,61 @@
     &.is-label-area,
     &.is-label-area:active {
       cursor: default;
+    }
+  }
+
+  .tape-track-labels {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 72px;
+    background: #edf2ed;
+    color: #526058;
+    font-family: system-ui;
+    font-size: 12px;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .tape-waveform-label,
+  .tape-track-label {
+    position: absolute;
+    left: 8px;
+  }
+
+  .tape-waveform-label {
+    top: 24.62%;
+    display: flex;
+    line-height: 14px;
+    transform: translateY(-50%);
+    flex-direction: column;
+
+    &:not(.has-gain) {
+      line-height: 12px;
+    }
+  }
+
+  .tape-track-label {
+    transform: translateY(-50%);
+
+    &.is-bursts {
+      top: 45.08%;
+    }
+
+    &.is-bits {
+      top: 55.3%;
+    }
+
+    &.is-bytes {
+      top: 65.91%;
+    }
+
+    &.is-decode {
+      top: 76.14%;
+    }
+
+    &.is-basic {
+      top: 88.64%;
     }
   }
 

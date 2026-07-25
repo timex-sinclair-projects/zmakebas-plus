@@ -25,16 +25,26 @@ import {
   zx81TapeLogicalGapNavigation,
 } from '../model/zx81TapeLogicalBits'
 import { canSplitZx81TapeBit, type Zx81TapeWorkspace } from '../model/zx81TapeWorkspace'
-import { drawZx81TapeCanvas, tapeCanvasLabelWidth, tapeCanvasLogicalHeight, type Zx81TapeInsertionRangeDraft } from './zx81TapeCanvas'
+import { drawZx81TapeCanvas, formatWaveformDisplayGain, tapeCanvasLabelWidth, tapeCanvasLogicalHeight, waveformDisplayGainForSamples, type Zx81TapeInsertionRangeDraft } from './zx81TapeCanvas'
 import { insertionBoundaryAtCanvas, insertionBoundaryForHitTarget, sampleAtClientX, tapeCanvasHitTarget } from './zx81TapeHitTesting'
-import { canEditSelection, canMergeSelection, clamp, extendedLogicalBitRange, logicalBitMatchesSelection, logicalBitSelectionIds, resizedInsertionRange, waveformViewForBit, waveformZoomAnchorForBit } from './zx81TapePaneModel'
+import { canEditSelection, canMergeSelection, clamp, extendedLogicalBitRange, logicalBitMatchesSelection, logicalBitSelectionIds, maximumTapePaneHeight, resizedInsertionRange, waveformViewForBit, waveformZoomAnchorForBit } from './zx81TapePaneModel'
 import { Zx81CarrierRecoverySwitch } from './Zx81CarrierRecoverySwitch'
 import { Zx81SignalConditioningSwitch } from './Zx81SignalConditioningSwitch'
 import { Zx81SignalRestorationSwitch } from './Zx81SignalRestorationSwitch'
 
 const minimumVisibleSamples = 256
 const minimumPaneHeight = 330
-const maximumPaneHeight = 620
+const fallbackMaximumPaneHeight = 620
+
+type PaneResizeState = {
+  readonly clientY: number
+  currentHeight: number
+  readonly height: number
+  readonly maximumHeight: number
+  readonly pane: HTMLElement
+  readonly pointerId: number
+  readonly resizer: HTMLButtonElement
+}
 
 type Zx81TapePaneProps = {
   readonly canSelectProgramEntry: boolean
@@ -66,10 +76,13 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
   const dragRef = useRef<{ readonly clientX: number; readonly viewStart: number } | null>(null)
   const insertionRangeDraftRef = useRef<Zx81TapeInsertionRangeDraft | null>(null)
   const insertionResizeRef = useRef<{ readonly boundary: 'end' | 'start'; readonly insertionId: string } | null>(null)
-  const resizeRef = useRef<{ readonly clientY: number; readonly height: number; readonly pointerId: number } | null>(null)
+  const paneResizeActiveRef = useRef(false)
+  const paneResizeAnimationFrameRef = useRef<number | null>(null)
+  const resizeRef = useRef<PaneResizeState | null>(null)
   const suppressCanvasClickRef = useRef(false)
   const [collapsed, setCollapsed] = useState(false)
   const [collapseTransitioning, setCollapseTransitioning] = useState(false)
+  const [maximumPaneHeightValue, setMaximumPaneHeightValue] = useState(fallbackMaximumPaneHeight)
   const [paneHeight, setPaneHeight] = useState(390)
   const [canvasCursor, setCanvasCursor] = useState<'insert' | 'label' | 'link' | 'pan' | 'resize'>('pan')
   const [insertionMarkerSample, setInsertionMarkerSample] = useState<number | null>(null)
@@ -80,8 +93,13 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
   })
   const [viewStart, setViewStart] = useState(0)
   const [viewEnd, setViewEnd] = useState(workspace.automatic.samples.length)
+  const [waveformDisplayGain, setWaveformDisplayGain] = useState<number | null>(null)
   const [canvasSize, setCanvasSize] = useState({ height: tapeCanvasLogicalHeight, width: 800 })
-  const selectedLogicalBits = workspace.effective.logicalBits.filter((bit) => selectedBitIds.includes(bit.id))
+  const selectedBitIdSet = useMemo(() => new Set(selectedBitIds), [selectedBitIds])
+  const selectedLogicalBits = useMemo(
+    () => workspace.effective.logicalBits.filter((bit) => selectedBitIdSet.has(bit.id)),
+    [selectedBitIdSet, workspace.effective.logicalBits],
+  )
   const firstSelectedLogicalBit = selectedLogicalBits[0] ?? null
   const finalSelectedLogicalBit = selectedLogicalBits.at(-1) ?? null
   const selectedLogicalBit = selectedLogicalBits.length === 1 ? selectedLogicalBits[0] : undefined
@@ -103,20 +121,41 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
     workspace.effective.tapeBitEnd,
     workspace.effective.tapeBitStart,
   ])
-  const nextUnknownBit = nextUnknownZx81TapeLogicalBit(
+  const nextUnknownBit = useMemo(() => nextUnknownZx81TapeLogicalBit(
     workspace.effective.logicalBits,
     workspace.effective.tapeBitStart,
     workspace.effective.tapeBitEnd,
     selectedBitIds,
-  )
-  const previousUnknownBit = previousUnknownZx81TapeLogicalBit(
+  ), [
+    selectedBitIds,
+    workspace.effective.logicalBits,
+    workspace.effective.tapeBitEnd,
+    workspace.effective.tapeBitStart,
+  ])
+  const previousUnknownBit = useMemo(() => previousUnknownZx81TapeLogicalBit(
     workspace.effective.logicalBits,
     workspace.effective.tapeBitStart,
     workspace.effective.tapeBitEnd,
     selectedBitIds,
-  )
+  ), [
+    selectedBitIds,
+    workspace.effective.logicalBits,
+    workspace.effective.tapeBitEnd,
+    workspace.effective.tapeBitStart,
+  ])
   const visibleLength = Math.max(1, viewEnd - viewStart)
   const maximumPanStart = Math.max(0, workspace.automatic.samples.length - visibleLength)
+
+  const synchronizeCanvasSize = useCallback((canvas: HTMLCanvasElement): void => {
+    const bounds = canvas.getBoundingClientRect()
+    const nextSize = {
+      height: Math.max(120, Math.round(bounds.height)),
+      width: Math.max(320, Math.round(bounds.width)),
+    }
+    setCanvasSize((currentSize) => (
+      currentSize.height === nextSize.height && currentSize.width === nextSize.width ? currentSize : nextSize
+    ))
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -124,14 +163,29 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
       return
     }
     const observer = new ResizeObserver((entries) => {
+      if (paneResizeActiveRef.current) {
+        return
+      }
       const width = entries[0]?.contentRect.width
       if (width) {
-        setCanvasSize({ height: Math.max(120, Math.round(entries[0].contentRect.height)), width: Math.max(320, Math.round(width)) })
+        const nextSize = {
+          height: Math.max(120, Math.round(entries[0].contentRect.height)),
+          width: Math.max(320, Math.round(width)),
+        }
+        setCanvasSize((currentSize) => (
+          currentSize.height === nextSize.height && currentSize.width === nextSize.width ? currentSize : nextSize
+        ))
       }
     })
     observer.observe(canvas)
     return () => observer.disconnect()
   }, [collapsed])
+
+  useEffect(() => () => {
+    if (paneResizeAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(paneResizeAnimationFrameRef.current)
+    }
+  }, [])
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
@@ -142,6 +196,8 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
     const drawWidth = bounds.width > 0 ? Math.max(320, Math.round(bounds.width)) : canvasSize.width
     const drawHeight = bounds.height > 0 ? Math.max(120, Math.round(bounds.height)) : canvasSize.height
     drawZx81TapeCanvas(canvas, drawWidth, drawHeight, workspace, viewStart, viewEnd, selectedBitIds, insertionMarkerSample, insertionRangeDraft)
+    const nextDisplayGain = waveformDisplayGainForSamples(workspace.automatic.samples)
+    setWaveformDisplayGain((currentGain) => currentGain === nextDisplayGain ? currentGain : nextDisplayGain)
   }, [canvasSize, collapsed, collapseTransitioning, insertionMarkerSample, insertionRangeDraft, selectedBitIds, viewEnd, viewStart, workspace])
 
   const selectBits = useCallback((bitIds: readonly string[], extendSelection = false): void => {
@@ -307,8 +363,25 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
 
   function beginPaneResize(event: PointerEvent<HTMLButtonElement>): void {
     event.preventDefault()
+    const pane = event.currentTarget.parentElement
+    if (!pane) {
+      return
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
-    resizeRef.current = { clientY: event.clientY, height: paneHeight, pointerId: event.pointerId }
+    const maximumHeight = measuredMaximumPaneHeight(event.currentTarget)
+    const boundedHeight = Math.min(paneHeight, maximumHeight)
+    paneResizeActiveRef.current = true
+    setMaximumPaneHeightValue(maximumHeight)
+    setPaneHeight(boundedHeight)
+    resizeRef.current = {
+      clientY: event.clientY,
+      currentHeight: boundedHeight,
+      height: boundedHeight,
+      maximumHeight,
+      pane,
+      pointerId: event.pointerId,
+      resizer: event.currentTarget,
+    }
   }
 
   function updatePaneResize(event: PointerEvent<HTMLButtonElement>): void {
@@ -316,12 +389,37 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
     if (!resize || resize.pointerId !== event.pointerId) {
       return
     }
-    setPaneHeight(clamp(resize.height + resize.clientY - event.clientY, minimumPaneHeight, maximumPaneHeight))
+    resize.currentHeight = clamp(resize.height + resize.clientY - event.clientY, minimumPaneHeight, resize.maximumHeight)
+    if (paneResizeAnimationFrameRef.current !== null) {
+      return
+    }
+    paneResizeAnimationFrameRef.current = requestAnimationFrame(() => {
+      paneResizeAnimationFrameRef.current = null
+      const currentResize = resizeRef.current
+      if (currentResize) {
+        applyPaneResizeHeight(currentResize)
+      }
+    })
   }
 
   function endPaneResize(event: PointerEvent<HTMLButtonElement>): void {
-    if (resizeRef.current?.pointerId === event.pointerId) {
-      resizeRef.current = null
+    const resize = resizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) {
+      return
+    }
+    if (paneResizeAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(paneResizeAnimationFrameRef.current)
+      paneResizeAnimationFrameRef.current = null
+    }
+    applyPaneResizeHeight(resize)
+    resizeRef.current = null
+    paneResizeActiveRef.current = false
+    setPaneHeight(resize.currentHeight)
+    const canvas = canvasRef.current
+    if (canvas) {
+      synchronizeCanvasSize(canvas)
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
   }
@@ -329,7 +427,9 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
   function handleResizeKeyDown(event: KeyboardEvent<HTMLButtonElement>): void {
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'Home') {
       event.preventDefault()
-      setPaneHeight(event.key === 'Home' ? 390 : (height) => clamp(height + (event.key === 'ArrowUp' ? 16 : -16), minimumPaneHeight, maximumPaneHeight))
+      const maximumHeight = measuredMaximumPaneHeight(event.currentTarget)
+      setMaximumPaneHeightValue(maximumHeight)
+      setPaneHeight(event.key === 'Home' ? Math.min(390, maximumHeight) : (height) => clamp(height + (event.key === 'ArrowUp' ? 16 : -16), minimumPaneHeight, maximumHeight))
     }
   }
 
@@ -347,9 +447,13 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
           aria-label="Resize tape analysis pane"
           aria-orientation="horizontal"
           aria-valuemin={minimumPaneHeight}
-          aria-valuemax={maximumPaneHeight}
+          aria-valuemax={maximumPaneHeightValue}
           aria-valuenow={paneHeight}
-          onDoubleClick={() => setPaneHeight(390)}
+          onDoubleClick={(event) => {
+            const maximumHeight = measuredMaximumPaneHeight(event.currentTarget)
+            setMaximumPaneHeightValue(maximumHeight)
+            setPaneHeight(Math.min(390, maximumHeight))
+          }}
           onKeyDown={handleResizeKeyDown}
           onPointerCancel={endPaneResize}
           onPointerDown={beginPaneResize}
@@ -443,16 +547,29 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
             <span><i className="is-basic-damaged" aria-hidden="true" />Damaged BASIC</span>
             <span>Shift-click bits to select a range</span>
           </div>
-          <canvas
-            ref={canvasRef}
-            className={`tape-canvas is-${canvasCursor}-area`}
-            onClick={handleCanvasClick}
-            onMouseDown={beginCanvasMouseDown}
-            onMouseLeave={cancelCanvasMouseInteraction}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseUp={endCanvasMouseInteraction}
-            onWheel={handleWheel}
-          />
+          <div className="tape-canvas-stage">
+            <canvas
+              ref={canvasRef}
+              className={`tape-canvas is-${canvasCursor}-area`}
+              onClick={handleCanvasClick}
+              onMouseDown={beginCanvasMouseDown}
+              onMouseLeave={cancelCanvasMouseInteraction}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={endCanvasMouseInteraction}
+              onWheel={handleWheel}
+            />
+            <div className="tape-track-labels" aria-hidden="true">
+              <div className={`tape-waveform-label${waveformDisplayGain !== null && waveformDisplayGain >= 1.1 ? ' has-gain' : ''}`}>
+                <span>Waveform</span>
+                {waveformDisplayGain !== null && waveformDisplayGain >= 1.1 ? <span>×{formatWaveformDisplayGain(waveformDisplayGain)}</span> : null}
+              </div>
+              <span className="tape-track-label is-bursts">Bursts</span>
+              <span className="tape-track-label is-bits">Bits</span>
+              <span className="tape-track-label is-bytes">Bytes</span>
+              <span className="tape-track-label is-decode">Decode</span>
+              <span className="tape-track-label is-basic">BASIC</span>
+            </div>
+          </div>
           <Form.Range
             className="tape-pan-control"
             aria-label="Pan tape view"
@@ -682,4 +799,43 @@ export function Zx81TapePane({ canSelectProgramEntry, carrierRecoveryEnabled, si
     setViewStart(nextStart)
     setViewEnd(nextStart + visibleLength)
   }
+}
+
+function cssPixels(value: string): number {
+  const pixels = Number.parseFloat(value)
+  return Number.isFinite(pixels) ? pixels : 0
+}
+
+function applyPaneResizeHeight(resize: PaneResizeState): void {
+  resize.pane.style.height = `${resize.currentHeight}px`
+  resize.resizer.setAttribute('aria-valuenow', String(resize.currentHeight))
+}
+
+function measuredMaximumPaneHeight(resizer: HTMLElement): number {
+  const pane = resizer.parentElement
+  const editorStack = pane?.parentElement
+  const sourcePanel = pane?.previousElementSibling
+  const sourceHeader = sourcePanel?.querySelector<HTMLElement>('.source-panel-header')
+  if (!editorStack || !(sourcePanel instanceof HTMLElement) || !sourceHeader) {
+    return fallbackMaximumPaneHeight
+  }
+
+  const editorStackStyle = getComputedStyle(editorStack)
+  const sourcePanelStyle = getComputedStyle(sourcePanel)
+  const sourceHeaderStyle = getComputedStyle(sourceHeader)
+  const sourceHeaderHeight = sourceHeader.getBoundingClientRect().height
+    + cssPixels(sourceHeaderStyle.marginTop)
+    + cssPixels(sourceHeaderStyle.marginBottom)
+  const sourcePanelVerticalChrome = cssPixels(sourcePanelStyle.paddingTop)
+    + cssPixels(sourcePanelStyle.paddingBottom)
+    + cssPixels(sourcePanelStyle.borderTopWidth)
+    + cssPixels(sourcePanelStyle.borderBottomWidth)
+
+  return maximumTapePaneHeight(
+    editorStack.getBoundingClientRect().height,
+    sourceHeaderHeight,
+    sourcePanelVerticalChrome,
+    cssPixels(editorStackStyle.rowGap),
+    minimumPaneHeight,
+  )
 }
