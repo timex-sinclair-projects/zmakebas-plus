@@ -114,6 +114,7 @@ const systemFunctionOperandStoppers = new Set<TokenKind>([
   'ENDPAR',
   'ENDOFSTAT',
   'ENDOFLINE',
+  'ENDOFBASIC',
   'EOF',
   'THEN',
   'STEP',
@@ -392,7 +393,8 @@ export class Parser {
 
   parseLine(): LineNode {
     const lineNumberToken = this.expect('LINENUMBER')
-    const statements = this.parseStatementSequence(new Set<TokenKind>(['ENDOFLINE', 'EOF']))
+    const statements = this.parseStatementSequence(new Set<TokenKind>(['ENDOFLINE', 'ENDOFBASIC', 'EOF']))
+    this.match('ENDOFBASIC')
     const end = this.expect('ENDOFLINE')
 
     return {
@@ -923,7 +925,7 @@ export class Parser {
     const condition = this.parseExpression()
     this.expectExpressionType(condition, 'numeric')
     this.expect('THEN')
-    const thenStatements = this.parseStatementSequence(new Set<TokenKind>(['ENDOFLINE', 'EOF']))
+    const thenStatements = this.parseStatementSequence(new Set<TokenKind>(['ENDOFLINE', 'ENDOFBASIC', 'EOF']))
 
     return {
       type: 'IfStatement',
@@ -1908,7 +1910,7 @@ export class Parser {
   }
 
   private atStatementBoundary(): boolean {
-    return this.at('ENDOFSTAT') || this.at('ENDOFLINE') || this.at('EOF')
+    return this.at('ENDOFSTAT') || this.at('ENDOFLINE') || this.at('ENDOFBASIC') || this.at('EOF')
   }
 
   private consumeRawDisplayControlSequences(): void {

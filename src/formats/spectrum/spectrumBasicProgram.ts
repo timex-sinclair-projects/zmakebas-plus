@@ -138,6 +138,10 @@ function encodeToken(token: Token, isVariableToken: boolean, previousSignificant
     return [Number(token.value) & 0xff]
   }
 
+  if (token.kind === 'ENDOFBASIC') {
+    return encodeSpectrumText(token.lexeme)
+  }
+
   if (token.kind === 'NUMLIT') {
     if (previousSignificantToken?.kind === 'BIN') {
       return [...encodeSpectrumText(token.lexeme), tokenNumberMarker, ...encodeSpectrumNumber(parseBinaryLiteral(token))]
@@ -184,6 +188,10 @@ function detokenizeLine(lineBytes: Uint8Array, dialect: BasicDialect): string {
       continue
     }
 
+    if (byte === lineEndByte) {
+      return `${output}${detokenizePostEolBytes(lineBytes.subarray(index))}`
+    }
+
     if (byte === tokenNumberMarker && index + 5 < lineBytes.length) {
       index += 5
       continue
@@ -227,6 +235,18 @@ function detokenizeLine(lineBytes: Uint8Array, dialect: BasicDialect): string {
 
     output += byteToPlainSource(byte)
     justAppendedKeywordPadding = false
+  }
+
+  return output
+}
+
+function detokenizePostEolBytes(bytes: Uint8Array): string {
+  let output = ''
+
+  for (let index = 0; index < bytes.length; index += 1) {
+    const byte = bytes[index]
+    const source = byteToStringSource(byte)
+    output += index === bytes.length - 1 && /\s$/.test(source) ? `\\{${byte}}` : source
   }
 
   return output

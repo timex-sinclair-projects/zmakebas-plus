@@ -187,6 +187,10 @@ function tokenizeLine(logicalLine: LogicalLine, tokens: Token[], dialect: BasicD
 
     if (isRawByteEscapeStart(lineText, index)) {
       const rawByteToken = readRawByteEscape(lineText, positionAt, index, dialect)
+      if (containsLineEndByte(rawByteToken.tokens, dialect)) {
+        tokens.push(makeToken('ENDOFBASIC', lineText.slice(start), startPosition, positionAt(lineText.length), lineText.slice(start)))
+        break
+      }
       tokens.push(...rawByteToken.tokens)
       index = rawByteToken.nextIndex
       continue
@@ -221,6 +225,11 @@ function tokenizeLine(logicalLine: LogicalLine, tokens: Token[], dialect: BasicD
 
 function isRawByteEscapeStart(lineText: string, index: number): boolean {
   return lineText[index] === '\\' && lineText[index + 1] === '{'
+}
+
+function containsLineEndByte(tokens: readonly Token[], dialect: BasicDialect): boolean {
+  const lineEndByte = dialect === 'zx81' ? 0x76 : 0x0d
+  return tokens.some((token) => token.kind === 'RAWBYTE' && Number(token.value) === lineEndByte)
 }
 
 function readRawByteEscape(

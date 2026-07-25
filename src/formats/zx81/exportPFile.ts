@@ -80,6 +80,10 @@ function encodeToken(token: Token, isVariableToken: boolean): number[] {
     return [Number(token.value) & 0xff]
   }
 
+  if (token.kind === 'ENDOFBASIC') {
+    return encodeText(token.lexeme)
+  }
+
   const simpleText = commonSimpleTokenText[token.kind]
   if (simpleText) {
     return encodeText(simpleText)

@@ -2,6 +2,7 @@ export const tokenKinds = [
   'LINENUMBER',
   'ENDOFLINE',
   'ENDOFSTAT',
+  'ENDOFBASIC',
   'BEGINPAR',
   'ENDPAR',
   'COMMA',

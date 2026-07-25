@@ -105,6 +105,10 @@ export function detokenizeZx81Line(lineBytes: Uint8Array): string {
       continue
     }
 
+    if (byte === zx81LineEndByte) {
+      return `${output}${detokenizePostEolBytes(lineBytes.subarray(index))}`
+    }
+
     if (byte === numberMarker && index + 5 < lineBytes.length) {
       index += 5
       continue
@@ -134,6 +138,18 @@ export function detokenizeZx81Line(lineBytes: Uint8Array): string {
 
     output += byteToPlainSource(byte)
     justAppendedKeywordPadding = false
+  }
+
+  return output
+}
+
+function detokenizePostEolBytes(bytes: Uint8Array): string {
+  let output = ''
+
+  for (let index = 0; index < bytes.length; index += 1) {
+    const byte = bytes[index]
+    const source = byteToPlainSource(byte)
+    output += index === bytes.length - 1 && /\s$/.test(source) ? `\\{${byte}}` : source
   }
 
   return output

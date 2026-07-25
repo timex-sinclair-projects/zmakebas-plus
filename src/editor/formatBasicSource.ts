@@ -120,6 +120,10 @@ function formatToken(
     return { text: token.lexeme }
   }
 
+  if (token.kind === 'ENDOFBASIC') {
+    return { text: token.lexeme, noSpaceBefore: true }
+  }
+
   return formatPunctuation(token.kind, dialect)
 }
 

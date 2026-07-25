@@ -37,6 +37,7 @@ const tokenKindDisplayText: Partial<Record<TokenKind, string>> = {
   COMMA: '","',
   ENDOFLINE: 'end of line',
   ENDOFSTAT: '":"',
+  ENDOFBASIC: 'end of BASIC',
   ENDPAR: '")"',
   EOF: 'end of file',
   EQUAL: '"="',
@@ -58,7 +59,7 @@ const tokenKindDisplayText: Partial<Record<TokenKind, string>> = {
   VARNAME: 'variable name',
 }
 
-const tokenKindsWithSourceText = new Set<TokenKind>(['LINENUMBER', 'NUMLIT', 'RAWBYTE', 'STRINGLIT', 'VARNAME'])
+const tokenKindsWithSourceText = new Set<TokenKind>(['ENDOFBASIC', 'LINENUMBER', 'NUMLIT', 'RAWBYTE', 'STRINGLIT', 'VARNAME'])
 
 export function tokenKindDisplayName(kind: TokenKind): string {
   return tokenKindDisplayText[kind] ?? keywordTokenDisplayName(kind)
