@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ParseState } from '../components/types'
+import type { ParseState } from '../editor/types'
 import { usePreference } from './usePreference'
 import {
   mapGeneratedPosition,

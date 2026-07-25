@@ -1,11 +1,11 @@
-import type { ProgramNode } from './ast'
-import { spectrumTokenDefinitions, tokenByteMap, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition } from './basicTokens'
-import { spectranetStatementKinds, type BasicDialect } from './dialects'
-import { collectVariableStartOffsets, encodeSinclairFloatBytes, formatSpectrumDisplayControlEscape, formatSpectrumTextControlEscape, normalizeRemPayload } from './exportCommon'
-import { spectrumBlockGraphicSource } from './graphicEscapes'
-import { readSpectrumTextEscape } from './textEscapes'
-import { spectrumSimpleTokenText } from './tokenText'
-import type { Token } from './tokens'
+import type { ProgramNode } from '../../parser/ast'
+import { spectrumTokenDefinitions, tokenByteMap, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition } from '../../parser/basicTokens'
+import { spectranetStatementKinds, type BasicDialect } from '../../parser/dialects'
+import { spectrumBlockGraphicSource } from '../../parser/graphicEscapes'
+import { formatSpectrumDisplayControlEscape, formatSpectrumTextControlEscape, readSpectrumTextEscape } from '../../parser/textEscapes'
+import { spectrumSimpleTokenText } from '../../parser/tokenText'
+import type { Token } from '../../parser/tokens'
+import { collectVariableStartOffsets, encodeSinclairFloatBytes, normalizeRemPayload } from '../common/exportCommon'
 
 type KeywordText = {
   readonly text: string

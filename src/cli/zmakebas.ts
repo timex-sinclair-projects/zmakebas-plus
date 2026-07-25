@@ -1,11 +1,8 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from 'node:fs/promises'
 import process from 'node:process'
+import { createBasicProgramBytes, createPlus3DosFile, createTapFile, createZx81PFile } from '../formats'
 import {
-  createBasicProgramBytes,
-  createPlus3DosFile,
-  createTapFile,
-  createZx81PFile,
   parseZxBasic,
   preprocessLabels,
   type BasicDialect,

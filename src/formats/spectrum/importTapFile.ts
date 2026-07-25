@@ -1,5 +1,5 @@
-import { isSpectrumFamilyDialect, type BasicDialect } from './dialects'
-import type { ProgramFileEntry, ProgramFileEntryType } from './programFileEntry'
+import { isSpectrumFamilyDialect, type BasicDialect } from '../../parser/dialects'
+import type { ProgramFileEntry, ProgramFileEntryType } from '../common/programFileEntry'
 import { detokenizeBasicProgram } from './spectrumBasicProgram'
 
 export type ImportedTapProgram = {

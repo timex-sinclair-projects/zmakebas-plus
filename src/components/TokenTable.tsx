@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Table from 'react-bootstrap/Table'
 import { useResizableColumns, type ResizableColumn } from '../hooks/useResizableColumns'
 import type { Token } from '../parser'
-import type { LineNavigationRequest } from './types'
+import type { LineNavigationRequest } from '../editor/types'
 
 type TokenTableProps = {
   readonly navigationRequest: LineNavigationRequest | null

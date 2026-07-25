@@ -6,7 +6,7 @@ import { AstTree } from './AstTree'
 import { GeneratedSource } from './GeneratedSource'
 import { GoToLineControl } from './GoToLineControl'
 import { TokenTable } from './TokenTable'
-import type { LineNavigationRequest, ParseState } from './types'
+import type { LineNavigationRequest, ParseState } from '../editor/types'
 
 type ParserResultsProps = {
   readonly labelModeEnabled: boolean

@@ -10,8 +10,8 @@ import {
   type BasicDialect,
   type BasicExtension,
 } from './dialects'
-import { parseSpectrumDisplayControlEscape } from './exportCommon'
 import { basicKeywordAliases } from './keywordAliases'
+import { parseSpectrumDisplayControlEscape } from './textEscapes'
 import { lexerSimpleTokenText } from './tokenText'
 import type { SourcePosition, SourceSpan, Token, TokenKind } from './tokens'
 

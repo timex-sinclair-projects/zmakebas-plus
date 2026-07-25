@@ -6,7 +6,7 @@ import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsListOl, BsTextL
 import type { BasicDialect, BasicExtension } from '../parser'
 import { GoToLineControl } from './GoToLineControl'
 import { SourceCodeEditor, type SourceCodeEditorHandle } from './SourceCodeEditor'
-import type { SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest } from './types'
+import type { SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest, SourceRangeNavigationRequest } from '../editor/types'
 
 const defaultEditorFontSize = 15
 const minEditorFontSize = 12
@@ -19,6 +19,7 @@ type SourcePanelProps = {
   readonly diagnostic: SourceDiagnostic | null
   readonly gotoLineMode: 'basic' | 'source'
   readonly navigationRequest: SourceNavigationRequest | null
+  readonly rangeNavigationRequest: SourceRangeNavigationRequest | null
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly showLineNumbers: boolean
@@ -40,6 +41,7 @@ export function SourcePanel({
   diagnostic,
   gotoLineMode,
   navigationRequest,
+  rangeNavigationRequest,
   screenWidth,
   screenWrapHintsEnabled,
   showLineNumbers,
@@ -91,6 +93,12 @@ export function SourcePanel({
     const endColumnOffset = Math.min(Math.max(columnOffset + 1, (navigationRequest.endColumn ?? navigationRequest.column + 1) - 1), target.text.length)
     moveEditorToRange(target.offset + columnOffset, target.offset + endColumnOffset)
   }, [draftSource, moveEditorToRange, navigationRequest])
+
+  useEffect(() => {
+    if (rangeNavigationRequest) {
+      moveEditorToRange(rangeNavigationRequest.start, rangeNavigationRequest.end)
+    }
+  }, [moveEditorToRange, rangeNavigationRequest])
 
   function handleSourceInput(nextSource: string): void {
     onSourceDraftChange(nextSource)

@@ -1,8 +1,8 @@
 import { BsCheckCircleFill, BsExclamationTriangleFill } from 'react-icons/bs'
 import type { BasicDialect, StatementNode } from '../parser'
-import { programFileFormatName, type ProgramExportFormat } from '../services/programFile'
+import { programFileFormatName, type ProgramExportFormat } from '../features/programFiles/programFile'
 import { zmakebasVersion } from '../version'
-import type { ParseState, SourceCursorPosition } from './types'
+import type { ParseState, SourceCursorPosition } from '../editor/types'
 
 type ParserStatusAlertProps = {
   readonly cursorPosition: SourceCursorPosition

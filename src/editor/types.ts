@@ -24,6 +24,12 @@ export type SourceNavigationRequest = {
   readonly endColumn?: number
 }
 
+export type SourceRangeNavigationRequest = {
+  readonly end: number
+  readonly id: number
+  readonly start: number
+}
+
 export type SourceDiagnostic = {
   readonly title: string
   readonly message: string

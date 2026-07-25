@@ -1,7 +1,7 @@
-import type { ProgramNode } from './ast'
-import { writeWord } from './exportCommon'
+import type { ProgramNode } from '../../parser/ast'
+import type { Token } from '../../parser/tokens'
+import { writeWord } from '../common/exportCommon'
 import { createBasicProgramBytes } from './spectrumBasicProgram'
-import type { Token } from './tokens'
 
 const noAutostartLine = 0x8000
 const defaultTapName = 'ZXBASIC'

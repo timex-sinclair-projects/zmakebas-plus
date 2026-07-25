@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ProgramNode } from '../parser'
-import type { LineNavigationRequest } from './types'
+import type { LineNavigationRequest } from '../editor/types'
 
 type AstTreeProps = {
   readonly ast: ProgramNode

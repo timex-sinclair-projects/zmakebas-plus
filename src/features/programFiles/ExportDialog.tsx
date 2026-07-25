@@ -2,9 +2,9 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import Modal from 'react-bootstrap/Modal'
-import { isDockExport, isPlus3DosExport, programFileFormatName, type ProgramExportFormat } from '../services/programFile'
-import type { BasicDialect } from '../parser'
-import { NumberStepper } from './NumberStepper'
+import { NumberStepper } from '../../components/NumberStepper'
+import type { BasicDialect } from '../../parser'
+import { isDockExport, isPlus3DosExport, programFileFormatName, type ProgramExportFormat } from './programFile'
 
 type ExportDialogProps = {
   readonly autostartEnabled: boolean

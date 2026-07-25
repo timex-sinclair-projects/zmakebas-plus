@@ -3,13 +3,14 @@ import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import Modal from 'react-bootstrap/Modal'
 import { BsExclamationTriangleFill } from 'react-icons/bs'
-import type { ProgramFileEntry } from '../parser'
+import type { ProgramFileEntry } from '../../formats'
 
 type ProgramFileSelectionDialogProps = {
   readonly confirmLabel?: string
   readonly entries: readonly ProgramFileEntry[]
   readonly formatName?: string
   readonly fileName: string
+  readonly initialSelectedEntryId?: number
   readonly showFileName?: boolean
   readonly show: boolean
   readonly warningMessage?: string
@@ -22,6 +23,7 @@ export function ProgramFileSelectionDialog({
   entries,
   fileName,
   formatName = 'program file',
+  initialSelectedEntryId,
   showFileName = true,
   show,
   warningMessage,
@@ -29,7 +31,7 @@ export function ProgramFileSelectionDialog({
   onConfirm,
 }: ProgramFileSelectionDialogProps) {
   const loadableEntries = useMemo(() => entries.filter((entry) => entry.loadable), [entries])
-  const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null)
+  const [selectedEntryId, setSelectedEntryId] = useState<number | null>(initialSelectedEntryId ?? null)
   const effectiveSelectedEntryId = loadableEntries.some((entry) => entry.id === selectedEntryId) ? selectedEntryId : loadableEntries[0]?.id ?? null
   const canSubmit = effectiveSelectedEntryId !== null
 
@@ -44,7 +46,7 @@ export function ProgramFileSelectionDialog({
   }
 
   return (
-    <Modal show={show} onHide={onCancel} centered>
+    <Modal animation={false} backdrop="static" show={show} onHide={onCancel} centered>
       <Form onSubmit={handleSubmit}>
         <Modal.Header closeButton>
           <Modal.Title>Select {formatName} entry</Modal.Title>
@@ -58,9 +60,9 @@ export function ProgramFileSelectionDialog({
                 className={`program-file-entry-option${entry.loadable ? '' : ' is-disabled'}${effectiveSelectedEntryId === entry.id ? ' is-selected' : ''}`}
                 htmlFor={`program-file-entry-${entry.id}`}
               >
-                <Form.Check
+                <input
                   checked={effectiveSelectedEntryId === entry.id}
-                  className="program-file-entry-input visually-hidden"
+                  className="program-file-entry-input"
                   disabled={!entry.loadable}
                   id={`program-file-entry-${entry.id}`}
                   name="program-file-entry"

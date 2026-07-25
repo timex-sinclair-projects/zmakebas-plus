@@ -1,4 +1,4 @@
-import type { BasicDialect } from '../parser'
+import type { BasicDialect } from '../../parser'
 
 export type ProgramExportFormat = 'tap' | 'wav' | 'plus3dos' | 'dck'
 

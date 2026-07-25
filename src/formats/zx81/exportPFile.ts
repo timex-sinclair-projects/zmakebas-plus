@@ -1,9 +1,9 @@
-import type { ProgramNode } from './ast'
-import { tokenByteMap, zx81TokenDefinitions } from './basicTokens'
-import { collectVariableStartOffsets, encodeSinclairFloatBytes, normalizeRemPayload, writeWord } from './exportCommon'
-import { readZx81TextEscape } from './textEscapes'
-import { commonSimpleTokenText } from './tokenText'
-import type { Token } from './tokens'
+import type { ProgramNode } from '../../parser/ast'
+import { tokenByteMap, zx81TokenDefinitions } from '../../parser/basicTokens'
+import { readZx81TextEscape } from '../../parser/textEscapes'
+import { commonSimpleTokenText } from '../../parser/tokenText'
+import type { Token } from '../../parser/tokens'
+import { collectVariableStartOffsets, encodeSinclairFloatBytes, normalizeRemPayload, writeWord } from '../common/exportCommon'
 
 const programBaseAddress = 0x407d
 const noAutostartLine = 0x8000

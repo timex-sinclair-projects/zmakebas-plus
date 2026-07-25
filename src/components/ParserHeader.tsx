@@ -2,7 +2,7 @@ import { useRef, type ChangeEvent } from 'react'
 import Button from 'react-bootstrap/Button'
 import ButtonGroup from 'react-bootstrap/ButtonGroup'
 import { BsDownload, BsEraserFill, BsFileEarmarkCodeFill, BsList, BsUpload } from 'react-icons/bs'
-import { programFileFormatName, type ProgramExportFormat } from '../services/programFile'
+import { programFileFormatName, type ProgramExportFormat } from '../features/programFiles/programFile'
 import type { BasicDialect } from '../parser'
 import { dialectLabel } from '../parser/dialects'
 
@@ -33,7 +33,7 @@ export function ParserHeader({
 }: ParserHeaderProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const exportLabel = `${programFileFormatName(dialect, programExportFormat)} file`
-  const uploadAccept = dialect === 'zx81' ? '.bas,.txt,.p,text/plain' : dialect === 'ts2068' ? '.bas,.txt,.tap,.dck,text/plain' : '.bas,.txt,.tap,text/plain'
+  const uploadAccept = dialect === 'zx81' ? '.bas,.txt,.p,.wav,audio/wav,text/plain' : dialect === 'ts2068' ? '.bas,.txt,.tap,.dck,text/plain' : '.bas,.txt,.tap,text/plain'
 
   function handleUploadChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.currentTarget.files?.[0]

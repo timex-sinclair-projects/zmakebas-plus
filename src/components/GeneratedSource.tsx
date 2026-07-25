@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { LineNavigationRequest } from './types'
+import type { LineNavigationRequest } from '../editor/types'
 
 type GeneratedSourceProps = {
   readonly navigationRequest: LineNavigationRequest | null
