@@ -167,10 +167,28 @@ export type SourceSpan = {
   readonly end: SourcePosition
 }
 
+export type StoredNumberBytes = readonly [number, number, number, number, number]
+
+type StoredNumberBase = {
+  readonly annotation: string
+  readonly span: SourceSpan
+}
+
+export type StoredNumber =
+  | (StoredNumberBase & {
+      readonly kind: 'bytes'
+      readonly bytes: StoredNumberBytes
+    })
+  | (StoredNumberBase & {
+      readonly kind: 'value'
+      readonly value: number
+    })
+
 export type Token = {
   readonly kind: TokenKind
   readonly lexeme: string
   readonly span: SourceSpan
+  readonly storedNumber?: StoredNumber
   readonly value?: number | string
 }
 

@@ -161,6 +161,16 @@ export function preprocessLabels(source: string, options: LabelModeOptions): Lab
   }
 }
 
+/** Maps an exclusive generated-source end position back to the original label-mode source. */
+export function mapGeneratedEndPosition(sourceMap: LabelSourceMap | null, position: SourcePosition): SourcePosition | null {
+  if (!sourceMap) {
+    return null
+  }
+
+  const previousCharacter = mapGeneratedPosition(sourceMap, position.line, Math.max(1, position.column - 1))
+  return previousCharacter ? { ...previousCharacter, column: previousCharacter.column + 1, offset: previousCharacter.offset + 1 } : null
+}
+
 export function mapGeneratedPosition(sourceMap: LabelSourceMap | null, line: number, column: number): SourcePosition | null {
   if (!sourceMap) {
     return null

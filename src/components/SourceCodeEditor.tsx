@@ -3,7 +3,8 @@ import { EditorSelection, StateEffect, StateField, type EditorState, type Extens
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import CodeMirror from '@uiw/react-codemirror'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, type CSSProperties } from 'react'
-import { lex, scanStringLiteralDisplayItems, type BasicDialect, type BasicExtension, type Token, type TokenKind } from '../parser'
+import { lex, scanStringLiteralDisplayItems, type BasicDialect, type BasicExtension, type LabelSourceMap, type Token, type TokenKind } from '../parser'
+import { createStoredNumberDiagnostics } from '../editor/storedNumberDiagnostics'
 import type { SourceCursorPosition, SourceDiagnostic } from '../editor/types'
 import { createZxBasicLanguageExtensions } from '../editor/zxBasicLanguage'
 
@@ -19,6 +20,8 @@ type SourceCodeEditorProps = {
   readonly id: string
   readonly dialect: BasicDialect
   readonly extensions: readonly BasicExtension[]
+  readonly sourceMap: LabelSourceMap | null
+  readonly tokens: readonly Token[]
   readonly diagnostic: SourceDiagnostic | null
   readonly fontSize: number
   readonly screenWidth: number
@@ -49,7 +52,23 @@ const tapeSourceHighlightField = StateField.define<DecorationSet>({
 })
 
 export const SourceCodeEditor = forwardRef<SourceCodeEditorHandle, SourceCodeEditorProps>(function SourceCodeEditor(
-  { id, dialect, extensions: basicExtensions, diagnostic, fontSize, screenWidth, screenWrapHintsEnabled, showLineNumbers, value, ariaLabel, onBlur, onChange, onCursorChange },
+  {
+    id,
+    dialect,
+    extensions: basicExtensions,
+    sourceMap,
+    tokens,
+    diagnostic,
+    fontSize,
+    screenWidth,
+    screenWrapHintsEnabled,
+    showLineNumbers,
+    value,
+    ariaLabel,
+    onBlur,
+    onChange,
+    onCursorChange,
+  },
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null)
@@ -158,8 +177,9 @@ export const SourceCodeEditor = forwardRef<SourceCodeEditorHandle, SourceCodeEdi
     }
 
     const editorDiagnostic = diagnostic ? sourceDiagnosticToCodeMirrorDiagnostic(view.state, diagnostic) : null
-    view.dispatch(setDiagnostics(view.state, editorDiagnostic ? [editorDiagnostic] : []))
-  }, [diagnostic])
+    const diagnostics = [...(editorDiagnostic ? [editorDiagnostic] : []), ...createStoredNumberDiagnostics(view.state, tokens, sourceMap, dialect)]
+    view.dispatch(setDiagnostics(view.state, diagnostics))
+  }, [diagnostic, dialect, sourceMap, tokens, value])
 
   useImperativeHandle(
     ref,

@@ -65,6 +65,28 @@ DATA "Foo"
 DATA "Bat"
 ```
 
+## Numeric Values
+
+Sinclair BASIC stores a five-byte numeric value after each numeric literal. The stored value normally matches the displayed text, but protected, hand-edited, or damaged programs can contain a different runtime value. zmakebas+ preserves this with a `NUMBER` annotation immediately after the visible literal:
+
+```basic
+20 GOSUB USR 0\{NUMBER 0x8F25800000}
+```
+
+The `0x` form contains exactly ten hexadecimal digits: the five bytes in storage order. Imports use this form whenever the stored bytes differ from the canonical encoding of the visible literal, so importing and exporting preserves those bytes exactly.
+
+You can instead specify the intended stored/runtime value as a decimal number:
+
+```basic
+20 GOSUB USR 0\{NUMBER 21184}
+30 PRINT 0\{NUMBER -0.5}
+40 PRINT 0\{NUMBER 1.2E-3}
+```
+
+Decimal annotations accept signed integers, fractions, and exponents. Use the hexadecimal form when exact bytes matter; use the decimal form when the numeric value is what matters.
+
+The annotation is metadata for the preceding literal and does not replace its visible text. The editor reports when the two values differ and offers actions to keep either the text value or the stored value.
+
 ## Exporting
 
 Choose the target dialect before exporting:

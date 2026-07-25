@@ -3,7 +3,7 @@ import Button from 'react-bootstrap/Button'
 import Dropdown from 'react-bootstrap/Dropdown'
 import Form from 'react-bootstrap/Form'
 import { BsBullseye, BsCheckAll, BsClipboard, BsClipboardPlus, BsListOl, BsTextLeft, BsThreeDotsVertical, BsZoomIn, BsZoomOut } from 'react-icons/bs'
-import type { BasicDialect, BasicExtension } from '../parser'
+import type { BasicDialect, BasicExtension, LabelSourceMap, Token } from '../parser'
 import { GoToLineControl } from './GoToLineControl'
 import { SourceCodeEditor, type SourceCodeEditorHandle } from './SourceCodeEditor'
 import type { SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest, SourceRangeNavigationRequest } from '../editor/types'
@@ -11,11 +11,14 @@ import type { SourceCursorPosition, SourceDiagnostic, SourceNavigationRequest, S
 const defaultEditorFontSize = 15
 const minEditorFontSize = 12
 const maxEditorFontSize = 22
+const noTokens: readonly Token[] = []
 
 type SourcePanelProps = {
   readonly source: string
   readonly dialect: BasicDialect
   readonly extensions: readonly BasicExtension[]
+  readonly sourceMap: LabelSourceMap | null
+  readonly tokens: readonly Token[]
   readonly diagnostic: SourceDiagnostic | null
   readonly gotoLineMode: 'basic' | 'source'
   readonly navigationRequest: SourceNavigationRequest | null
@@ -38,6 +41,8 @@ export function SourcePanel({
   source,
   dialect,
   extensions,
+  sourceMap,
+  tokens,
   diagnostic,
   gotoLineMode,
   navigationRequest,
@@ -220,6 +225,8 @@ export function SourcePanel({
         ariaLabel="BASIC listing"
         dialect={dialect}
         extensions={extensions}
+        sourceMap={draftSource === source ? sourceMap : null}
+        tokens={draftSource === source ? tokens : noTokens}
         diagnostic={draftSource === source ? diagnostic : null}
         fontSize={editorFontSize}
         id="basic-source"

@@ -73,7 +73,11 @@ function encodeToken(token: Token, isVariableToken: boolean): number[] {
   }
 
   if (token.kind === 'NUMLIT') {
-    return [...encodeText(token.lexeme.toUpperCase()), 0x7e, ...encodeNumber(Number(token.value))]
+    const storedBytes =
+      token.storedNumber?.kind === 'bytes'
+        ? token.storedNumber.bytes
+        : encodeNumber(token.storedNumber?.kind === 'value' ? token.storedNumber.value : Number(token.value))
+    return [...encodeText(token.lexeme.toUpperCase()), 0x7e, ...storedBytes]
   }
 
   if (token.kind === 'RAWBYTE') {
@@ -198,7 +202,7 @@ function encodeCharacter(char: string): number {
 }
 
 function encodeNumber(value: number): number[] {
-  return encodeSinclairFloatBytes(Math.abs(value), { exportFormat: 'P file', numericRange: 'ZX81' })
+  return encodeSinclairFloatBytes(value, { exportFormat: 'P file', numericRange: 'ZX81' })
 }
 
 function createHeader(programLength: number, autostartOffset: number | null): Uint8Array {

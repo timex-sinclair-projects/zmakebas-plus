@@ -3,6 +3,7 @@ import type { ParseState } from '../editor/types'
 import { usePreference } from './usePreference'
 import {
   mapGeneratedPosition,
+  mapGeneratedEndPosition,
   parseZxBasic,
   preprocessLabels,
   ZxBasicLexError,
@@ -12,7 +13,7 @@ import {
   type BasicExtension,
   type LabelSourceMap,
 } from '../parser'
-import type { SourcePosition, SourceSpan } from '../parser/tokens'
+import type { SourceSpan } from '../parser/tokens'
 import { sampleProgramForDialect } from '../services/sampleProgram'
 
 export const defaultLabelStartLine = 10
@@ -292,13 +293,4 @@ function mapErrorSpan(sourceMap: LabelSourceMap | null, span: SourceSpan): Sourc
   const start = mapGeneratedPosition(sourceMap, span.start.line, span.start.column) ?? span.start
   const end = mapGeneratedEndPosition(sourceMap, span.end) ?? span.end
   return { start, end }
-}
-
-function mapGeneratedEndPosition(sourceMap: LabelSourceMap | null, position: SourcePosition): SourcePosition | null {
-  if (!sourceMap) {
-    return null
-  }
-
-  const previousCharacter = mapGeneratedPosition(sourceMap, position.line, Math.max(1, position.column - 1))
-  return previousCharacter ? { ...previousCharacter, column: previousCharacter.column + 1, offset: previousCharacter.offset + 1 } : null
 }

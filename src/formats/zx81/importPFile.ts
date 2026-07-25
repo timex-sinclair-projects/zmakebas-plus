@@ -1,5 +1,8 @@
 import { type BasicTokenDefinition, zx81TokenDefinitions } from '../../parser/basicTokens'
 import { zx81BlockGraphicSources, zx81InverseCharacterSources } from '../../parser/graphicEscapes'
+import type { StoredNumberBytes } from '../../parser/tokens'
+import { encodeSinclairFloatBytes } from '../common/exportCommon'
+import { importedStoredNumberAnnotation } from '../common/storedNumbers'
 
 export type ImportedPFile = {
   readonly mappings: readonly ImportedPFileSourceMapping[]
@@ -110,6 +113,10 @@ export function detokenizeZx81Line(lineBytes: Uint8Array): string {
     }
 
     if (byte === numberMarker && index + 5 < lineBytes.length) {
+      const storedNumberBytes: StoredNumberBytes = [lineBytes[index + 1], lineBytes[index + 2], lineBytes[index + 3], lineBytes[index + 4], lineBytes[index + 5]]
+      output += importedStoredNumberAnnotation(output, storedNumberBytes, 'zx81', (literal) =>
+        encodeSinclairFloatBytes(Math.abs(literal.value), { exportFormat: 'P file', numericRange: 'ZX81' }),
+      )
       index += 5
       continue
     }

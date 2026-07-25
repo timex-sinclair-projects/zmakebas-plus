@@ -11,9 +11,11 @@ import {
   type BasicExtension,
 } from './dialects'
 import { basicKeywordAliases } from './keywordAliases'
+import { scanDecimalNumber } from './decimalNumber'
+import { readStoredNumberAnnotation } from './storedNumber'
 import { parseSpectrumDisplayControlEscape } from './textEscapes'
 import { lexerSimpleTokenText } from './tokenText'
-import type { SourcePosition, SourceSpan, Token, TokenKind } from './tokens'
+import type { SourcePosition, SourceSpan, StoredNumber, Token, TokenKind } from './tokens'
 
 type KeywordSpec = {
   readonly text: string
@@ -323,40 +325,27 @@ function countPreviousBackslashes(text: string, index: number): number {
 }
 
 function readNumber(lineText: string, positionAt: (index: number) => SourcePosition, start: number): { token: Token; nextIndex: number } {
-  let index = start
-
-  while (index < lineText.length && isDigit(lineText[index])) {
-    index += 1
+  const decimalNumber = scanDecimalNumber(lineText, start, { allowLoneDecimalPoint: true })
+  if (!decimalNumber) {
+    throw new Error('Internal lexer error: expected a decimal number.')
   }
 
-  if (lineText[index] === '.') {
-    index += 1
-    while (index < lineText.length && isDigit(lineText[index])) {
-      index += 1
-    }
-  }
+  const { lexeme, nextIndex: index, value } = decimalNumber
+  const annotation = readStoredNumberAnnotation(lineText, positionAt, index)
+  const storedNumber: StoredNumber | undefined = annotation
+    ? {
+        annotation: annotation.annotation,
+        ...(annotation.kind === 'bytes' ? { kind: 'bytes' as const, bytes: annotation.bytes } : { kind: 'value' as const, value: annotation.value }),
+        span: spanFrom(positionAt(index), positionAt(annotation.nextIndex)),
+      }
+    : undefined
 
-  if (lineText[index]?.toUpperCase() === 'E') {
-    const exponentStart = index
-    let exponentIndex = index + 1
-    if (lineText[exponentIndex] === '+' || lineText[exponentIndex] === '-') {
-      exponentIndex += 1
-    }
-    const digitStart = exponentIndex
-    while (exponentIndex < lineText.length && isDigit(lineText[exponentIndex])) {
-      exponentIndex += 1
-    }
-    if (exponentIndex > digitStart) {
-      index = exponentIndex
-    } else {
-      index = exponentStart
-    }
-  }
-
-  const lexeme = lineText.slice(start, index)
   return {
-    token: makeToken('NUMLIT', lexeme, positionAt(start), positionAt(index), Number(lexeme.startsWith('.') ? `0${lexeme}` : lexeme)),
-    nextIndex: index,
+    token: {
+      ...makeToken('NUMLIT', lexeme, positionAt(start), positionAt(index), value),
+      storedNumber,
+    },
+    nextIndex: annotation?.nextIndex ?? index,
   }
 }
 

@@ -223,6 +223,10 @@ function createZxBasicStreamParser(dialect: BasicDialect, extensions: readonly B
         return 'number'
       }
 
+      if (stream.match(/^\\\{NUMBER[ \t]+(?:0x[0-9a-f]{10}|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:E[+-]?\d+)?)\}/i)) {
+        return 'storedNumber'
+      }
+
       const pairedOperator = pairedOperators.find((operator) => stream.match(operator, false))
       if (pairedOperator) {
         stream.match(pairedOperator)
@@ -261,6 +265,7 @@ function createZxBasicStreamParser(dialect: BasicDialect, extensions: readonly B
     },
     tokenTable: {
       lineNumber: tags.labelName,
+      storedNumber: tags.meta,
     },
   }
 }
@@ -269,6 +274,7 @@ const zxBasicHighlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: '#075985', fontWeight: '600' },
   { tag: tags.labelName, color: '#7c2d12', fontWeight: '600' },
   { tag: tags.number, color: '#b45309', fontWeight: '500' },
+  { tag: tags.meta, color: '#64748b', fontStyle: 'italic' },
   { tag: tags.string, color: '#9f1239' },
   { tag: tags.comment, color: '#66736b', fontStyle: 'italic' },
   { tag: tags.variableName, color: '#26322b' },

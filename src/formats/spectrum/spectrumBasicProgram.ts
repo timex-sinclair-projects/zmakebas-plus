@@ -4,8 +4,9 @@ import { spectranetStatementKinds, type BasicDialect } from '../../parser/dialec
 import { spectrumBlockGraphicSource } from '../../parser/graphicEscapes'
 import { formatSpectrumDisplayControlEscape, formatSpectrumTextControlEscape, readSpectrumTextEscape } from '../../parser/textEscapes'
 import { spectrumSimpleTokenText } from '../../parser/tokenText'
-import type { Token } from '../../parser/tokens'
+import type { StoredNumberBytes, Token } from '../../parser/tokens'
 import { collectVariableStartOffsets, encodeSinclairFloatBytes, normalizeRemPayload } from '../common/exportCommon'
+import { importedStoredNumberAnnotation } from '../common/storedNumbers'
 
 type KeywordText = {
   readonly text: string
@@ -143,10 +144,16 @@ function encodeToken(token: Token, isVariableToken: boolean, previousSignificant
   }
 
   if (token.kind === 'NUMLIT') {
+    const annotatedValue = token.storedNumber?.kind === 'value' ? token.storedNumber.value : null
+    const storedNumberBytes = token.storedNumber?.kind === 'bytes' ? token.storedNumber.bytes : null
     if (previousSignificantToken?.kind === 'BIN') {
-      return [...encodeSpectrumText(token.lexeme), tokenNumberMarker, ...encodeSpectrumNumber(parseBinaryLiteral(token))]
+      return [
+        ...encodeSpectrumText(token.lexeme),
+        tokenNumberMarker,
+        ...(storedNumberBytes ?? encodeSpectrumNumber(annotatedValue ?? parseBinaryLiteral(token))),
+      ]
     }
-    return [...encodeSpectrumText(token.lexeme), tokenNumberMarker, ...encodeSpectrumNumber(Number(token.value))]
+    return [...encodeSpectrumText(token.lexeme), tokenNumberMarker, ...(storedNumberBytes ?? encodeSpectrumNumber(annotatedValue ?? Number(token.value)))]
   }
 
   const simpleText = spectrumSimpleTokenText[token.kind]
@@ -193,6 +200,8 @@ function detokenizeLine(lineBytes: Uint8Array, dialect: BasicDialect): string {
     }
 
     if (byte === tokenNumberMarker && index + 5 < lineBytes.length) {
+      const storedNumberBytes: StoredNumberBytes = [lineBytes[index + 1], lineBytes[index + 2], lineBytes[index + 3], lineBytes[index + 4], lineBytes[index + 5]]
+      output += importedStoredNumberAnnotation(output, storedNumberBytes, dialect, (literal) => encodeSpectrumNumber(literal.value))
       index += 5
       continue
     }
@@ -379,13 +388,11 @@ function encodeSpectrumText(text: string): number[] {
 }
 
 function encodeSpectrumNumber(value: number): number[] {
-  const absoluteValue = Math.abs(value)
-
-  if (Number.isInteger(value) && absoluteValue <= 65535) {
-    return [0x00, 0x00, absoluteValue & 0xff, (absoluteValue >> 8) & 0xff, 0x00]
+  if (Number.isInteger(value) && value >= -65536 && value <= 65535) {
+    return value < 0 ? [0x00, 0xff, value & 0xff, (value >> 8) & 0xff, 0x00] : [0x00, 0x00, value & 0xff, (value >> 8) & 0xff, 0x00]
   }
 
-  return encodeSinclairFloatBytes(absoluteValue, { exportFormat: 'BASIC program', numericRange: 'Spectrum' })
+  return encodeSinclairFloatBytes(value, { exportFormat: 'BASIC program', numericRange: 'Spectrum' })
 }
 
 function parseIntegerLiteral(text: string, radix: number): number {

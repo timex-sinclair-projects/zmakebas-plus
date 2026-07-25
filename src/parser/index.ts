@@ -19,8 +19,9 @@ export { lex, Parser }
 export type { BasicDialect, BasicExtension, ParserOptions }
 export { scanStringLiteralDisplayItems } from './displayText'
 export type { StringLiteralDisplayItem } from './displayText'
-export { mapGeneratedPosition, preprocessLabels, ZxBasicPreprocessError } from './labels'
+export { mapGeneratedEndPosition, mapGeneratedPosition, preprocessLabels, ZxBasicPreprocessError } from './labels'
 export type { LabelModeOptions, LabelPreprocessResult, LabelSourceMap } from './labels'
+export { decodeStoredNumberBytes, formatStoredNumberAnnotation, formatStoredNumberBytesAnnotation } from './storedNumber'
 export type * from './ast'
-export type { Token, TokenKind } from './tokens'
+export type { StoredNumber, StoredNumberBytes, Token, TokenKind } from './tokens'
 export { ZxBasicLexError, ZxBasicSyntaxError } from './errors'

@@ -1,6 +1,7 @@
 import { spectrumTokenDefinitions, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition, zx81TokenDefinitions } from '../parser/basicTokens'
 import { defaultDialect, type BasicDialect, type BasicExtension } from '../parser/dialects'
 import { lex } from '../parser/lexer'
+import { formatStoredNumberAnnotation } from '../parser/storedNumber'
 import { commonSimpleTokenText } from '../parser/tokenText'
 import type { Token, TokenKind } from '../parser/tokens'
 
@@ -112,7 +113,12 @@ function formatToken(
     return { text: labels.get(token.lexeme) ?? token.lexeme, wordLike: true }
   }
 
-  if (token.kind === 'LINENUMBER' || token.kind === 'NUMLIT' || token.kind === 'RAWBYTE') {
+  if (token.kind === 'NUMLIT') {
+    const storedNumber = token.storedNumber ? formatStoredNumberAnnotation(token.storedNumber) : ''
+    return { text: `${token.lexeme}${storedNumber}`, wordLike: true }
+  }
+
+  if (token.kind === 'LINENUMBER' || token.kind === 'RAWBYTE') {
     return { text: token.lexeme, wordLike: true }
   }
 

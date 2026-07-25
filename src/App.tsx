@@ -21,8 +21,10 @@ import { Zx81WavImportProgress } from './features/programFiles/Zx81WavImportProg
 import { Zx81TapePane } from './features/zx81Tape/components/Zx81TapePane'
 import { useZx81TapeController } from './features/zx81Tape/hooks/useZx81TapeController'
 import { useZxBasicParser } from './hooks/useZxBasicParser'
-import type { BasicDialect, BasicExtension, LabelSourceMap } from './parser'
+import type { BasicDialect, BasicExtension, LabelSourceMap, Token } from './parser'
 import { isBuiltInSampleProgram, normalizeSampleSource, sampleProgramForDialect } from './services/sampleProgram'
+
+const noTokens: readonly Token[] = []
 
 function App() {
   const { isProcessing, startProcessing, stopProcessing } = useBusyIndicator()
@@ -522,6 +524,8 @@ function App() {
                   source={source}
                   dialect={dialect}
                   extensions={extensions}
+                  sourceMap={source === parsedSource && parseState.ok ? sourceMap : null}
+                  tokens={source === parsedSource && parseState.ok ? parseState.tokens : noTokens}
                   diagnostic={sourceDiagnostic}
                   gotoLineMode={labelModeEnabled ? 'source' : 'basic'}
                   navigationRequest={sourceNavigation}

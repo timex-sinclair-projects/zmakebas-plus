@@ -44,8 +44,10 @@ export function visitNode(value: unknown, visit: (node: NodeBase) => void): void
 }
 
 export function encodeSinclairFloatBytes(value: number, range: SinclairFloatRange): number[] {
-  const { exponent, mantissa } = encodeSinclairFloat(value, range)
-  return [exponent, (mantissa >>> 24) & 0xff, (mantissa >>> 16) & 0xff, (mantissa >>> 8) & 0xff, mantissa & 0xff]
+  const negative = value < 0
+  const { exponent, mantissa } = encodeSinclairFloat(Math.abs(value), range)
+  const leadingMantissaByte = (mantissa >>> 24) & 0x7f
+  return [exponent, negative ? leadingMantissaByte | 0x80 : leadingMantissaByte, (mantissa >>> 16) & 0xff, (mantissa >>> 8) & 0xff, mantissa & 0xff]
 }
 
 function encodeSinclairFloat(value: number, range: SinclairFloatRange): { readonly exponent: number; readonly mantissa: number } {

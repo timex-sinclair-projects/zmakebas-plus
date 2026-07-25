@@ -1,4 +1,4 @@
-import type { SourceSpan, TokenKind } from './tokens'
+import type { SourceSpan, StoredNumber, TokenKind } from './tokens'
 
 export type NodeBase = {
   readonly type: string
@@ -220,6 +220,7 @@ export type NumberLiteralNode = NodeBase & {
   readonly type: 'NumberLiteral'
   readonly value: number
   readonly raw: string
+  readonly storedNumber?: StoredNumber
 }
 
 export type StringLiteralNode = NodeBase & {

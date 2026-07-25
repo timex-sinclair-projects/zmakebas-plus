@@ -1,5 +1,5 @@
-import { mapGeneratedPosition, type ExpressionNode, type LabelSourceMap, type ProgramNode, type StatementNode } from '../parser'
-import type { SourcePosition, SourceSpan } from '../parser/tokens'
+import { mapGeneratedEndPosition, mapGeneratedPosition, type ExpressionNode, type LabelSourceMap, type ProgramNode, type StatementNode } from '../parser'
+import type { SourceSpan } from '../parser/tokens'
 
 type RenumberBasicSourceOptions = {
   readonly ast: ProgramNode
@@ -323,9 +323,10 @@ function addNumberLiteralReplacement(
     return
   }
 
+  const storedNumberRange = node.storedNumber ? sourceRangeForSpan(node.storedNumber.span, sourceMap) : null
   replacements.push({
     start: sourceRange.start,
-    end: sourceRange.end,
+    end: storedNumberRange?.end ?? sourceRange.end,
     text: String(targetLineNumber),
   })
 }
@@ -342,11 +343,6 @@ function sourceRangeForSpan(span: SourceSpan, sourceMap: LabelSourceMap | null):
   }
 
   return { start: start.offset, end: end.offset }
-}
-
-function mapGeneratedEndPosition(sourceMap: LabelSourceMap, position: SourceSpan['end']): SourcePosition | null {
-  const previousCharacter = mapGeneratedPosition(sourceMap, position.line, Math.max(1, position.column - 1))
-  return previousCharacter ? { ...previousCharacter, column: previousCharacter.column + 1, offset: previousCharacter.offset + 1 } : null
 }
 
 function applyReplacements(source: string, replacements: readonly Replacement[]): string {

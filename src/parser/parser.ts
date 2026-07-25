@@ -1385,6 +1385,7 @@ export class Parser {
         type: 'NumberLiteral',
         value: numberValue(token),
         raw: token.lexeme,
+        storedNumber: token.storedNumber,
         span: token.span,
       }
     }
@@ -1504,6 +1505,7 @@ export class Parser {
         type: 'NumberLiteral',
         value: Number.parseInt(literal.lexeme, 2),
         raw: literal.lexeme,
+        storedNumber: literal.storedNumber,
         span: literal.span,
       } satisfies ExpressionNode
       return { type: 'SystemFunctionCall', functionName: start.kind, args: [arg], span: joinSpans(start.span, literal.span) }
