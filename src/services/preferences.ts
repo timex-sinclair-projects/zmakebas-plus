@@ -53,9 +53,9 @@ export const preferenceDefaults: IPreferenceValues = {
   screenWrapHintsEnabled: true,
   spectranetEnabled: false,
   programExportFormat: defaultProgramExportFormat,
-  zx81CarrierRecoveryEnabled: false,
-  zx81SignalConditioningEnabled: false,
-  zx81SignalRestorationEnabled: false,
+  zx81CarrierRecoveryEnabled: true,
+  zx81SignalConditioningEnabled: true,
+  zx81SignalRestorationEnabled: true,
 }
 
 type StoredPreferences = Partial<IPreferenceValues> & {
