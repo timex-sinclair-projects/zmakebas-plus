@@ -1,4 +1,11 @@
+import type { BasicDialect } from './dialects'
 import { spectrumBlockGraphicBytes, zx81BlockGraphicBytes, zx81InverseCharacterBytes, zx81SingleCharacterEscapes } from './graphicEscapes'
+
+const namedLineEndEscapes = {
+  spectrum: { byte: 0x0d, name: 'ENTER' },
+  ts2068: { byte: 0x0d, name: 'ENTER' },
+  zx81: { byte: 0x76, name: 'NEWLINE' },
+} as const satisfies Record<BasicDialect, { readonly byte: number; readonly name: string }>
 
 const spectrumDisplayControls = new Map(
   [
@@ -10,6 +17,18 @@ const spectrumDisplayControls = new Map(
     ['OVER', { byte: 0x15, max: 1 }],
   ] satisfies Array<readonly [string, { readonly byte: number; readonly max: number }]>,
 )
+
+/** Parses the active dialect's named line-end escape body into its byte value. */
+export function parseNamedLineEndEscape(text: string, dialect: BasicDialect): number | null {
+  const lineEnd = namedLineEndEscapes[dialect]
+  return text.trim().toUpperCase() === lineEnd.name ? lineEnd.byte : null
+}
+
+/** Formats the active dialect's line-end byte as its canonical named escape. */
+export function formatNamedLineEndEscape(byte: number, dialect: BasicDialect): string | null {
+  const lineEnd = namedLineEndEscapes[dialect]
+  return byte === lineEnd.byte ? `\\{${lineEnd.name}}` : null
+}
 
 /** Parses a Spectrum display-control escape into its binary bytes. */
 export function parseSpectrumDisplayControlEscape(text: string): number[] | null {
@@ -131,6 +150,11 @@ export function readSpectrumTextEscape(text: string, slashIndex: number): TextEs
         return encodedEscape(textControl, end + 1, spectrumTextControlDisplayEffect(textControl))
       }
 
+      const namedLineEnd = parseNamedLineEndEscape(rawValue, 'spectrum')
+      if (namedLineEnd !== null) {
+        return encodedEscape([namedLineEnd], end + 1, displayEffect())
+      }
+
       if (!isStrictRawByteValue(rawValue)) {
         throw new Error(`Cannot export TAP: invalid raw byte escape "\\{${rawValue}}".`)
       }
@@ -179,7 +203,7 @@ export function readSpectrumDisplayTextEscape(text: string, slashIndex: number):
         return textControl
       }
 
-      if (isLenientRawByteValue(rawValue)) {
+      if (parseNamedLineEndEscape(rawValue, 'spectrum') !== null || isLenientRawByteValue(rawValue)) {
         return displayEscape(end + 1)
       }
     }
@@ -238,7 +262,17 @@ export function readZx81TextEscape(text: string, slashIndex: number): TextEscape
         throw new Error('Cannot export P file: unclosed ZX81 byte escape.')
       }
 
-      const byte = parseZx81IntegerLiteral(text.slice(slashIndex + 2, end))
+      const rawValue = text.slice(slashIndex + 2, end)
+      const namedLineEnd = parseNamedLineEndEscape(rawValue, 'zx81')
+      if (namedLineEnd !== null) {
+        return encodedEscape([namedLineEnd], end + 1, displayEffect())
+      }
+
+      if (/^[A-Za-z]+$/.test(rawValue.trim())) {
+        throw new Error(`Cannot export P file: invalid ZX81 byte escape ${JSON.stringify(text.slice(slashIndex, end + 1))}.`)
+      }
+
+      const byte = parseZx81IntegerLiteral(rawValue)
       if (!Number.isInteger(byte) || byte < 0 || byte > 0xff) {
         throw new Error(`Cannot export P file: ZX81 byte escape ${JSON.stringify(text.slice(slashIndex, end + 1))} is out of range.`)
       }
@@ -264,8 +298,11 @@ export function readZx81DisplayTextEscape(text: string, slashIndex: number): Dis
 
   if (escape === '{') {
     const end = text.indexOf('}', slashIndex + 2)
-    if (end !== -1 && isLenientRawByteValue(text.slice(slashIndex + 2, end))) {
-      return displayEscape(end + 1)
+    if (end !== -1) {
+      const rawValue = text.slice(slashIndex + 2, end)
+      if (parseNamedLineEndEscape(rawValue, 'zx81') !== null || isLenientRawByteValue(rawValue)) {
+        return displayEscape(end + 1)
+      }
     }
   }
 

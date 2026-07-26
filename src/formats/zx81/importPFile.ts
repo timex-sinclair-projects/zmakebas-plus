@@ -1,5 +1,6 @@
 import { type BasicTokenDefinition, zx81TokenDefinitions } from '../../parser/basicTokens'
 import { zx81BlockGraphicSources, zx81InverseCharacterSources } from '../../parser/graphicEscapes'
+import { formatNamedLineEndEscape } from '../../parser/textEscapes'
 import type { StoredNumberBytes } from '../../parser/tokens'
 import { encodeSinclairFloatBytes } from '../common/exportCommon'
 import { importedStoredNumberAnnotation } from '../common/storedNumbers'
@@ -231,6 +232,11 @@ function byteToTextBodySource(byte: number): string {
 }
 
 function byteToPlainSource(byte: number): string {
+  const lineEnd = formatNamedLineEndEscape(byte, 'zx81')
+  if (lineEnd !== null) {
+    return lineEnd
+  }
+
   if (byte === 0x0c) {
     return '\\\\'
   }

@@ -2,7 +2,12 @@ import type { ProgramNode } from '../../parser/ast'
 import { spectrumTokenDefinitions, tokenByteMap, ts2068ExtensionTokenDefinitions, type BasicTokenDefinition } from '../../parser/basicTokens'
 import { spectranetStatementKinds, type BasicDialect } from '../../parser/dialects'
 import { spectrumBlockGraphicSource } from '../../parser/graphicEscapes'
-import { formatSpectrumDisplayControlEscape, formatSpectrumTextControlEscape, readSpectrumTextEscape } from '../../parser/textEscapes'
+import {
+  formatNamedLineEndEscape,
+  formatSpectrumDisplayControlEscape,
+  formatSpectrumTextControlEscape,
+  readSpectrumTextEscape,
+} from '../../parser/textEscapes'
 import { spectrumSimpleTokenText } from '../../parser/tokenText'
 import type { StoredNumberBytes, Token } from '../../parser/tokens'
 import { collectVariableStartOffsets, encodeSinclairFloatBytes, normalizeRemPayload } from '../common/exportCommon'
@@ -312,6 +317,11 @@ function displayControlSource(bytes: Uint8Array, index: number): { readonly sour
 }
 
 function byteToStringSource(byte: number): string {
+  const lineEnd = formatNamedLineEndEscape(byte, 'spectrum')
+  if (lineEnd !== null) {
+    return lineEnd
+  }
+
   if (byte === 0x22) {
     return '"'
   }
@@ -337,6 +347,11 @@ function byteToStringSource(byte: number): string {
 }
 
 function byteToRemSource(byte: number, isLastByte: boolean): string {
+  const lineEnd = formatNamedLineEndEscape(byte, 'spectrum')
+  if (lineEnd !== null) {
+    return lineEnd
+  }
+
   if (byte === 0x5c) {
     return '\\\\'
   }
@@ -362,6 +377,11 @@ function byteToRemSource(byte: number, isLastByte: boolean): string {
 }
 
 function byteToPlainSource(byte: number): string {
+  const lineEnd = formatNamedLineEndEscape(byte, 'spectrum')
+  if (lineEnd !== null) {
+    return lineEnd
+  }
+
   if (byte >= 0x20 && byte <= 0x7e) {
     return String.fromCharCode(byte)
   }

@@ -13,7 +13,7 @@ import {
 import { basicKeywordAliases } from './keywordAliases'
 import { scanDecimalNumber } from './decimalNumber'
 import { readStoredNumberAnnotation } from './storedNumber'
-import { parseSpectrumDisplayControlEscape } from './textEscapes'
+import { formatNamedLineEndEscape, parseNamedLineEndEscape, parseSpectrumDisplayControlEscape } from './textEscapes'
 import { lexerSimpleTokenText } from './tokenText'
 import type { SourcePosition, SourceSpan, StoredNumber, Token, TokenKind } from './tokens'
 
@@ -230,8 +230,7 @@ function isRawByteEscapeStart(lineText: string, index: number): boolean {
 }
 
 function containsLineEndByte(tokens: readonly Token[], dialect: BasicDialect): boolean {
-  const lineEndByte = dialect === 'zx81' ? 0x76 : 0x0d
-  return tokens.some((token) => token.kind === 'RAWBYTE' && Number(token.value) === lineEndByte)
+  return tokens.some((token) => token.kind === 'RAWBYTE' && formatNamedLineEndEscape(Number(token.value), dialect) !== null)
 }
 
 function readRawByteEscape(
@@ -247,6 +246,14 @@ function readRawByteEscape(
 
   const rawValue = lineText.slice(start + 2, end)
   const span = spanFrom(positionAt(start), positionAt(end + 1))
+  const namedLineEnd = parseNamedLineEndEscape(rawValue, dialect)
+  if (namedLineEnd !== null) {
+    return {
+      nextIndex: end + 1,
+      tokens: [makeToken('RAWBYTE', lineText.slice(start, end + 1), positionAt(start), positionAt(end + 1), namedLineEnd)],
+    }
+  }
+
   if (isSpectrumFamilyDialect(dialect)) {
     try {
       const controlBytes = parseSpectrumDisplayControlEscape(rawValue)

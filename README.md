@@ -27,6 +27,7 @@ The input format broadly follows the zmakebas README:
 - Keyword-looking variables are allowed in variable contexts where validation can distinguish them, such as `LET at=0`.
 - UDG escapes `\A` through `\U`, block graphics, copyright `\*`, raw byte, literal `@`, and literal backslash escape forms are supported in exported strings and REM text. Imported Spectrum-family TAP strings and REM text use `\*` for © (copyright), and readable block-graphic backslash forms for bytes `128` through `143`, except for block forms ending in a space at the end of REM text where numeric escapes preserve the stored byte. UDG bytes stay as numeric raw-byte escapes so the stored character codes remain visible.
 - Spectrum-family display-control escapes are available as readable raw-byte aliases: `\{INK n}` and `\{PAPER n}` use `0..9`; `\{FLASH n}`, `\{BRIGHT n}`, `\{INVERSE n}`, and `\{OVER n}` use `0..1`. These can be used anywhere raw byte escapes can be used, including strings and REM text.
+- Line-end bytes also have readable, dialect-specific raw-byte aliases: Spectrum and TS2068 use `\{ENTER}` while ZX81 uses `\{NEWLINE}`.
 - In ZX81 mode, lowercase letters in the program text follow zmakebas compatibility and export as inverse `A-Z`. Use uppercase text for normal ZX81 letters. Imported ZX81 P files use backslash forms for inverse letters, inverse digits, inverse punctuation, and block graphics where that is roundtrip-safe.
 
 ## Differences From zmakebas
