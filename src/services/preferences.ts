@@ -5,7 +5,7 @@ import { defaultDialect, type BasicDialect } from '../parser/dialects'
 const preferenceStorageKey = 'zmakebas.preferences'
 const preferenceVersion = 1
 
-export type OptionsPaneSectionId = 'target' | 'export' | 'labels' | 'format' | 'display' | 'validation'
+export type OptionsPaneSectionId = 'target' | 'export' | 'labels' | 'renumber' | 'format' | 'display' | 'validation'
 export type OptionsPaneSectionCollapsedStates = Record<OptionsPaneSectionId, boolean>
 
 export interface IPreferenceValues {
@@ -14,6 +14,8 @@ export interface IPreferenceValues {
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
+  readonly renumberIncrement: number
+  readonly renumberStartLine: number
   readonly formatterKeywordCase: FormatKeywordCase
   readonly optionsCollapsed: boolean
   readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
@@ -34,12 +36,15 @@ export const preferenceDefaults: IPreferenceValues = {
   labelIncrement: 2,
   labelModeEnabled: true,
   labelStartLine: 10,
+  renumberIncrement: 10,
+  renumberStartLine: 10,
   formatterKeywordCase: 'upper',
   optionsCollapsed: false,
   optionsSectionCollapsed: {
     target: false,
     export: false,
     labels: true,
+    renumber: true,
     format: true,
     display: true,
     validation: true,
@@ -71,6 +76,8 @@ export function loadPreferences(): IPreferenceValues {
     labelIncrement: readIntegerPreference(storedPreferences.labelIncrement, preferenceDefaults.labelIncrement, 1, 1000),
     labelModeEnabled: readBooleanPreference(storedPreferences.labelModeEnabled, preferenceDefaults.labelModeEnabled),
     labelStartLine: readIntegerPreference(storedPreferences.labelStartLine, preferenceDefaults.labelStartLine, 0, 9999),
+    renumberIncrement: readIntegerPreference(storedPreferences.renumberIncrement, preferenceDefaults.renumberIncrement, 1, 1000),
+    renumberStartLine: readIntegerPreference(storedPreferences.renumberStartLine, preferenceDefaults.renumberStartLine, 0, 9999),
     formatterKeywordCase: readFormatterKeywordCasePreference(storedPreferences.formatterKeywordCase, preferenceDefaults.formatterKeywordCase),
     optionsCollapsed: readBooleanPreference(storedPreferences.optionsCollapsed, preferenceDefaults.optionsCollapsed),
     optionsSectionCollapsed: readOptionsSectionCollapsedPreference(storedPreferences.optionsSectionCollapsed, preferenceDefaults.optionsSectionCollapsed),
@@ -175,6 +182,7 @@ function readOptionsSectionCollapsedPreference(value: unknown, defaultValue: Opt
     target: readBooleanPreference(value.target, defaultValue.target),
     export: readBooleanPreference(value.export, defaultValue.export),
     labels: readBooleanPreference(value.labels, defaultValue.labels),
+    renumber: readBooleanPreference(value.renumber, defaultValue.renumber),
     format: readBooleanPreference(value.format, defaultValue.format),
     display: readBooleanPreference(value.display, defaultValue.display),
     validation: readBooleanPreference(value.validation, defaultValue.validation),

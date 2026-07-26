@@ -76,6 +76,8 @@ function App() {
   const [screenWidth, setScreenWidth] = usePreference('screenWidth')
   const [programExportFormat, setProgramExportFormat] = usePreference('programExportFormat')
   const [formatterKeywordCase, setFormatterKeywordCase] = usePreference('formatterKeywordCase')
+  const [renumberIncrement, setRenumberIncrement] = usePreference('renumberIncrement')
+  const [renumberStartLine, setRenumberStartLine] = usePreference('renumberStartLine')
   const [optionsSectionCollapsed, setOptionsSectionCollapsed] = usePreference('optionsSectionCollapsed')
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
@@ -247,6 +249,8 @@ function App() {
         ast: parseState.ast,
         labelIncrement,
         labelStartLine,
+        renumberIncrement,
+        renumberStartLine,
         sourceMap,
       })
       commitSource(renumberedSource, {
@@ -486,6 +490,8 @@ function App() {
                   labelModeEnabled={labelModeEnabled}
                   labelStartLine={labelStartLine}
                   optionsSectionCollapsed={optionsSectionCollapsed}
+                  renumberIncrement={renumberIncrement}
+                  renumberStartLine={renumberStartLine}
                   screenWidth={screenWidth}
                   screenWrapHintsEnabled={screenWrapHintsEnabled}
                   spectranetEnabled={spectranetEnabled}
@@ -498,6 +504,8 @@ function App() {
                   onLabelModeEnabledChange={handleLabelModeEnabledChange}
                   onLabelStartLineChange={handleLabelStartLineChange}
                   onOptionsSectionCollapsedChange={setOptionsSectionCollapsed}
+                  onRenumberIncrementChange={setRenumberIncrement}
+                  onRenumberStartLineChange={setRenumberStartLine}
                   onScreenWidthChange={setScreenWidth}
                   onScreenWrapHintsEnabledChange={setScreenWrapHintsEnabled}
                   onSpectranetEnabledChange={handleSpectranetEnabledChange}

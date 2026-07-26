@@ -48,6 +48,8 @@ type ParserOptionsPaneProps = {
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
   readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
+  readonly renumberIncrement: number
+  readonly renumberStartLine: number
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
   readonly spectranetEnabled: boolean
@@ -60,6 +62,8 @@ type ParserOptionsPaneProps = {
   readonly onLabelModeEnabledChange: (enabled: boolean) => void
   readonly onLabelStartLineChange: (line: number) => void
   readonly onOptionsSectionCollapsedChange: (collapsedStates: OptionsPaneSectionCollapsedStates) => void
+  readonly onRenumberIncrementChange: (increment: number) => void
+  readonly onRenumberStartLineChange: (line: number) => void
   readonly onScreenWidthChange: (width: number) => void
   readonly onScreenWrapHintsEnabledChange: (enabled: boolean) => void
   readonly onSpectranetEnabledChange: (enabled: boolean) => void
@@ -77,6 +81,8 @@ export function ParserOptionsPane({
   labelModeEnabled,
   labelStartLine,
   optionsSectionCollapsed,
+  renumberIncrement,
+  renumberStartLine,
   screenWidth,
   screenWrapHintsEnabled,
   spectranetEnabled,
@@ -89,6 +95,8 @@ export function ParserOptionsPane({
   onLabelModeEnabledChange,
   onLabelStartLineChange,
   onOptionsSectionCollapsedChange,
+  onRenumberIncrementChange,
+  onRenumberStartLineChange,
   onScreenWidthChange,
   onScreenWrapHintsEnabledChange,
   onSpectranetEnabledChange,
@@ -191,6 +199,39 @@ export function ParserOptionsPane({
               onChange={(value) => commitNumberValue(value, 1, 1000, onLabelIncrementChange)}
               onStepDown={() => commitNumberValue(String(labelIncrement - 1), 1, 1000, onLabelIncrementChange)}
               onStepUp={() => commitNumberValue(String(labelIncrement + 1), 1, 1000, onLabelIncrementChange)}
+            />
+          </div>
+        </CollapsibleOptionGroup>
+
+        <CollapsibleOptionGroup title="Renumber" {...sectionProps('renumber')}>
+          <div className="label-mode-settings">
+            <NumberStepper
+              canStepDown={renumberStartLine > 0}
+              canStepUp={renumberStartLine < 9999}
+              className="label-number-control"
+              id="renumber-start-line"
+              inputGroupClassName="label-number-input"
+              label="Start line"
+              stepDownLabel="Decrease renumber start line"
+              stepUpLabel="Increase renumber start line"
+              value={String(renumberStartLine)}
+              onChange={(value) => commitNumberValue(value, 0, 9999, onRenumberStartLineChange)}
+              onStepDown={() => onRenumberStartLineChange(previousRoundedStep(renumberStartLine, labelStartLineStep, 0))}
+              onStepUp={() => onRenumberStartLineChange(nextRoundedStep(renumberStartLine, labelStartLineStep, 9999))}
+            />
+            <NumberStepper
+              canStepDown={renumberIncrement > 1}
+              canStepUp={renumberIncrement < 1000}
+              className="label-number-control"
+              id="renumber-increment"
+              inputGroupClassName="label-number-input"
+              label="Increment"
+              stepDownLabel="Decrease renumber increment"
+              stepUpLabel="Increase renumber increment"
+              value={String(renumberIncrement)}
+              onChange={(value) => commitNumberValue(value, 1, 1000, onRenumberIncrementChange)}
+              onStepDown={() => commitNumberValue(String(renumberIncrement - 1), 1, 1000, onRenumberIncrementChange)}
+              onStepUp={() => commitNumberValue(String(renumberIncrement + 1), 1, 1000, onRenumberIncrementChange)}
             />
           </div>
         </CollapsibleOptionGroup>

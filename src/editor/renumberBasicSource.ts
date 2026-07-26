@@ -5,6 +5,8 @@ type RenumberBasicSourceOptions = {
   readonly ast: ProgramNode
   readonly labelIncrement?: number
   readonly labelStartLine?: number
+  readonly renumberIncrement?: number
+  readonly renumberStartLine?: number
   readonly sourceMap: LabelSourceMap | null
 }
 
@@ -37,12 +39,17 @@ type Replacement = {
   readonly text: string
 }
 
-export function renumberBasicSource(source: string, { ast, labelIncrement = 2, labelStartLine = 10, sourceMap }: RenumberBasicSourceOptions): string {
+export function renumberBasicSource(
+  source: string,
+  { ast, labelIncrement = 2, labelStartLine = 10, renumberIncrement = 10, renumberStartLine = 10, sourceMap }: RenumberBasicSourceOptions,
+): string {
   const newline = source.includes('\r\n') ? '\r\n' : '\n'
   const normalizedSource = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const sourceLineNumbers = findSourceLineNumbers(normalizedSource, {
     labelIncrement,
     labelStartLine,
+    renumberIncrement,
+    renumberStartLine,
     sourceMap,
   })
 
@@ -77,6 +84,8 @@ function findSourceLineNumbers(
   options: {
     readonly labelIncrement: number
     readonly labelStartLine: number
+    readonly renumberIncrement: number
+    readonly renumberStartLine: number
     readonly sourceMap: LabelSourceMap | null
   },
 ): readonly SourceLineNumber[] {
@@ -84,14 +93,18 @@ function findSourceLineNumbers(
     return findLabelModeSourceLineNumbers(source, {
       labelIncrement: options.labelIncrement,
       labelStartLine: options.labelStartLine,
+      renumberIncrement: options.renumberIncrement,
+      renumberStartLine: options.renumberStartLine,
       sourceMap: options.sourceMap,
     })
   }
 
+  const normalizedRenumberIncrement = clampInteger(options.renumberIncrement, 1, 1000)
+  const normalizedRenumberStartLine = clampInteger(options.renumberStartLine, 0, 9999)
   const lines = source.endsWith('\n') ? source.slice(0, -1).split('\n') : source.split('\n')
   const sourceLineNumbers: SourceLineNumber[] = []
   let lastGeneratedLine = -1
-  let nextVisibleLine = 10
+  let nextVisibleLine = normalizedRenumberStartLine
   let visibleBlockEstablished = false
   let offset = 0
 
@@ -101,7 +114,7 @@ function findSourceLineNumbers(
     const explicitLine = linePrefix.explicitLine
 
     if (explicitLine) {
-      const newLineNumber = nextAvailableLineNumber(explicitLine.line, lastGeneratedLine, nextVisibleLine, visibleBlockEstablished)
+      const newLineNumber = nextAvailableLineNumber(explicitLine.line, lastGeneratedLine, nextVisibleLine, normalizedRenumberIncrement, visibleBlockEstablished)
       sourceLineNumbers.push({
         oldLineNumber: explicitLine.line,
         newLineNumber,
@@ -111,7 +124,7 @@ function findSourceLineNumbers(
         end: offset + explicitLine.end,
       })
       lastGeneratedLine = newLineNumber
-      nextVisibleLine = newLineNumber + 10
+      nextVisibleLine = newLineNumber + normalizedRenumberIncrement
       visibleBlockEstablished = true
     } else if (linePrefix.hasCode) {
       visibleBlockEstablished = false
@@ -128,19 +141,25 @@ function findLabelModeSourceLineNumbers(
   {
     labelIncrement,
     labelStartLine,
+    renumberIncrement,
+    renumberStartLine,
     sourceMap,
   }: {
     readonly labelIncrement: number
     readonly labelStartLine: number
+    readonly renumberIncrement: number
+    readonly renumberStartLine: number
     readonly sourceMap: LabelSourceMap
   },
 ): readonly SourceLineNumber[] {
+  const normalizedRenumberIncrement = clampInteger(renumberIncrement, 1, 1000)
+  const normalizedRenumberStartLine = clampInteger(renumberStartLine, 0, 9999)
   const lines = source.endsWith('\n') ? source.slice(0, -1).split('\n') : source.split('\n')
   const sourceLineNumbers: SourceLineNumber[] = []
   let currentIncrement = clampInteger(labelIncrement, 1, 1000)
   let lastGeneratedLine = -1
   let nextGeneratedLine = clampInteger(labelStartLine, 0, 9999) - currentIncrement
-  let nextVisibleLine = 10
+  let nextVisibleLine = normalizedRenumberStartLine
   let visibleBlockEstablished = false
   let offset = 0
 
@@ -155,7 +174,7 @@ function findLabelModeSourceLineNumbers(
     }
 
     if (explicitLine) {
-      const newLineNumber = nextAvailableLineNumber(explicitLine.line, lastGeneratedLine, nextVisibleLine, visibleBlockEstablished)
+      const newLineNumber = nextAvailableLineNumber(explicitLine.line, lastGeneratedLine, nextVisibleLine, normalizedRenumberIncrement, visibleBlockEstablished)
       sourceLineNumbers.push({
         oldLineNumber: explicitLine.line,
         newLineNumber,
@@ -164,7 +183,7 @@ function findLabelModeSourceLineNumbers(
         start: offset + explicitLine.fieldStart,
         end: offset + explicitLine.end,
       })
-      nextVisibleLine = newLineNumber + 10
+      nextVisibleLine = newLineNumber + normalizedRenumberIncrement
       visibleBlockEstablished = true
 
       if (linePrefix.hasCode) {
@@ -377,13 +396,13 @@ function clampInteger(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, Math.trunc(value)))
 }
 
-function roundUpToMultipleOf10(value: number): number {
-  return Math.max(10, Math.ceil(value / 10) * 10)
+function roundUpToMultiple(value: number, multiple: number): number {
+  return Math.max(multiple, Math.ceil(value / multiple) * multiple)
 }
 
-function nextAvailableLineNumber(oldLineNumber: number, lastGeneratedLine: number, nextVisibleLine: number, baseEstablished: boolean): number {
-  const preferredLineNumber = baseEstablished ? nextVisibleLine : roundUpToMultipleOf10(oldLineNumber)
-  return Math.max(preferredLineNumber, roundUpToMultipleOf10(lastGeneratedLine + 1))
+function nextAvailableLineNumber(oldLineNumber: number, lastGeneratedLine: number, nextVisibleLine: number, renumberIncrement: number, baseEstablished: boolean): number {
+  const preferredLineNumber = baseEstablished ? nextVisibleLine : Math.max(nextVisibleLine, roundUpToMultiple(oldLineNumber, renumberIncrement))
+  return Math.max(preferredLineNumber, roundUpToMultiple(lastGeneratedLine + 1, renumberIncrement))
 }
 
 function isDigit(char: string): boolean {
