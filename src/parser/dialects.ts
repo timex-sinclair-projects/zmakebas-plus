@@ -1,7 +1,7 @@
 import type { TokenKind } from './tokens'
 
 export type BasicDialect = 'spectrum' | 'ts2068' | 'zx81'
-export type BasicExtension = 'spectranet'
+export type BasicExtension = 'spectranet' | 'oliger-safe'
 
 export const defaultDialect: BasicDialect = 'spectrum'
 
@@ -10,6 +10,24 @@ export const ts2068OnlyExpressionKeywordKinds = new Set<TokenKind>(['STICK', 'FR
 export const ts2068OnlyKeywordKinds = new Set<TokenKind>([...ts2068OnlyStatementKinds, ...ts2068OnlyExpressionKeywordKinds])
 
 export const zx81OnlyStatementKinds = new Set<TokenKind>(['UNPLOT', 'SCROLL', 'FAST', 'SLOW'])
+export const oligerSafeSlashStatementKinds = new Set<TokenKind>([
+  'SAVE',
+  'OUT',
+  'LOAD',
+  'IN',
+  'RUN',
+  'GOSUB',
+  'MERGE',
+  'COPY',
+  'LET',
+  'MOVE',
+  'VERIFY',
+  'FORMAT',
+  'ERASE',
+  'RESTORE',
+  'CAT',
+  'FOR',
+])
 export const spectranetStatementKinds = new Set<TokenKind>([
   'SN_ACCEPT',
   'SN_ALOAD',
@@ -52,6 +70,10 @@ export function isBasicExtensionEnabled(extensions: readonly BasicExtension[] | 
 
 export function isSpectranetEnabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
   return isSpectrumFamilyDialect(dialect) && isBasicExtensionEnabled(extensions, 'spectranet')
+}
+
+export function isOligerSafeEnabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
+  return dialect === 'ts2068' && isBasicExtensionEnabled(extensions, 'oliger-safe')
 }
 
 export function dialectLabel(dialect: BasicDialect): string {

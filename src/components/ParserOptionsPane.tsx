@@ -52,6 +52,7 @@ type ParserOptionsPaneProps = {
   readonly renumberStartLine: number
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
+  readonly oligerSafeEnabled: boolean
   readonly spectranetEnabled: boolean
   readonly programExportFormat: ProgramExportFormat
   readonly onAutomaticParsingEnabledChange: (enabled: boolean) => void
@@ -66,6 +67,7 @@ type ParserOptionsPaneProps = {
   readonly onRenumberStartLineChange: (line: number) => void
   readonly onScreenWidthChange: (width: number) => void
   readonly onScreenWrapHintsEnabledChange: (enabled: boolean) => void
+  readonly onOligerSafeEnabledChange: (enabled: boolean) => void
   readonly onSpectranetEnabledChange: (enabled: boolean) => void
   readonly onProgramExportFormatChange: (format: ProgramExportFormat) => void
   readonly onValidate: () => void
@@ -85,6 +87,7 @@ export function ParserOptionsPane({
   renumberStartLine,
   screenWidth,
   screenWrapHintsEnabled,
+  oligerSafeEnabled,
   spectranetEnabled,
   programExportFormat,
   onAutomaticParsingEnabledChange,
@@ -99,6 +102,7 @@ export function ParserOptionsPane({
   onRenumberStartLineChange,
   onScreenWidthChange,
   onScreenWrapHintsEnabledChange,
+  onOligerSafeEnabledChange,
   onSpectranetEnabledChange,
   onProgramExportFormatChange,
   onValidate,
@@ -141,6 +145,15 @@ export function ParserOptionsPane({
             checked={dialect === 'spectrum' && spectranetEnabled}
             disabled={dialect !== 'spectrum'}
             onChange={(event) => onSpectranetEnabledChange(event.currentTarget.checked)}
+          />
+          <Form.Check
+            className="option-check"
+            type="checkbox"
+            id="oliger-safe-enabled"
+            label="JLO Disk"
+            checked={dialect === 'ts2068' && oligerSafeEnabled}
+            disabled={dialect !== 'ts2068'}
+            onChange={(event) => onOligerSafeEnabledChange(event.currentTarget.checked)}
           />
         </CollapsibleOptionGroup>
 

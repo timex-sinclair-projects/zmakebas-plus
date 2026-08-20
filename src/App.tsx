@@ -39,6 +39,7 @@ function App() {
   const {
     automaticParsingEnabled,
     dialect,
+    oligerSafeEnabled,
     labelIncrement,
     labelModeEnabled,
     labelStartLine,
@@ -47,6 +48,7 @@ function App() {
     requestParse,
     setAutomaticParsingEnabled,
     setDialect,
+    setOligerSafeEnabled,
     setSpectranetEnabled,
     setLabelIncrement,
     setLabelModeEnabled,
@@ -80,7 +82,11 @@ function App() {
   const [renumberStartLine, setRenumberStartLine] = usePreference('renumberStartLine')
   const [optionsSectionCollapsed, setOptionsSectionCollapsed] = usePreference('optionsSectionCollapsed')
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
-  const extensions = useMemo<readonly BasicExtension[]>(() => (dialect === 'spectrum' && spectranetEnabled ? ['spectranet'] : []), [dialect, spectranetEnabled])
+  const extensions = useMemo<readonly BasicExtension[]>(() => {
+    if (dialect === 'spectrum' && spectranetEnabled) return ['spectranet']
+    if (dialect === 'ts2068' && oligerSafeEnabled) return ['oliger-safe']
+    return []
+  }, [dialect, oligerSafeEnabled, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
   const programFilesRef = useRef<ProgramFilesState | null>(null)
@@ -378,6 +384,14 @@ function App() {
     clearNavigation()
   }
 
+  function handleOligerSafeEnabledChange(nextEnabled: boolean): void {
+    if (automaticParsingEnabled) {
+      startParserProcessing()
+    }
+    setOligerSafeEnabled(nextEnabled)
+    clearNavigation()
+  }
+
   function commitSource(nextSource: string, options: SourceCommitOptions = {}): void {
     const {
       clearNavigationAfterCommit = false,
@@ -494,6 +508,7 @@ function App() {
                   renumberStartLine={renumberStartLine}
                   screenWidth={screenWidth}
                   screenWrapHintsEnabled={screenWrapHintsEnabled}
+                  oligerSafeEnabled={oligerSafeEnabled}
                   spectranetEnabled={spectranetEnabled}
                   programExportFormat={programExportFormat}
                   onAutomaticParsingEnabledChange={handleAutomaticParsingEnabledChange}
@@ -508,6 +523,7 @@ function App() {
                   onRenumberStartLineChange={setRenumberStartLine}
                   onScreenWidthChange={setScreenWidth}
                   onScreenWrapHintsEnabledChange={setScreenWrapHintsEnabled}
+                  onOligerSafeEnabledChange={handleOligerSafeEnabledChange}
                   onSpectranetEnabledChange={handleSpectranetEnabledChange}
                   onProgramExportFormatChange={setProgramExportFormat}
                   onValidate={() => handleRefreshParse(sourceDraftRef.current)}

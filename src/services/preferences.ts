@@ -21,6 +21,7 @@ export interface IPreferenceValues {
   readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
   readonly screenWidth: number
   readonly screenWrapHintsEnabled: boolean
+  readonly oligerSafeEnabled: boolean
   readonly spectranetEnabled: boolean
   readonly programExportFormat: ProgramExportFormat
   readonly zx81CarrierRecoveryEnabled: boolean
@@ -51,6 +52,7 @@ export const preferenceDefaults: IPreferenceValues = {
   },
   screenWidth: 32,
   screenWrapHintsEnabled: true,
+  oligerSafeEnabled: false,
   spectranetEnabled: false,
   programExportFormat: defaultProgramExportFormat,
   zx81CarrierRecoveryEnabled: true,
@@ -83,6 +85,7 @@ export function loadPreferences(): IPreferenceValues {
     optionsSectionCollapsed: readOptionsSectionCollapsedPreference(storedPreferences.optionsSectionCollapsed, preferenceDefaults.optionsSectionCollapsed),
     screenWidth: readIntegerPreference(storedPreferences.screenWidth, preferenceDefaults.screenWidth, 1, 256),
     screenWrapHintsEnabled: readBooleanPreference(storedPreferences.screenWrapHintsEnabled, preferenceDefaults.screenWrapHintsEnabled),
+    oligerSafeEnabled: readBooleanPreference(storedPreferences.oligerSafeEnabled, preferenceDefaults.oligerSafeEnabled),
     spectranetEnabled: readBooleanPreference(storedPreferences.spectranetEnabled, preferenceDefaults.spectranetEnabled),
     programExportFormat: readProgramExportFormatPreference(storedPreferences.programExportFormat ?? storedPreferences.spectrumExportFormat, preferenceDefaults.programExportFormat),
     zx81CarrierRecoveryEnabled: readBooleanPreference(storedPreferences.zx81CarrierRecoveryEnabled, preferenceDefaults.zx81CarrierRecoveryEnabled),

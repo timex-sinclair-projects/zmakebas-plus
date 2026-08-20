@@ -20,6 +20,8 @@ import type {
   LineNode,
   NextStatementNode,
   OnErrStatementNode,
+  OligerSafeItemNode,
+  OligerSafeStatementNode,
   StorageItemNode,
   StorageStatementNode,
   PlotStatementNode,
@@ -42,8 +44,10 @@ import type {
 import {
   defaultDialect,
   dialectLabel,
+  isOligerSafeEnabled,
   isSpectranetEnabled,
   isSpectrumFamilyDialect,
+  oligerSafeSlashStatementKinds,
   spectranetStatementKinds,
   ts2068OnlyExpressionKeywordKinds,
   ts2068OnlyStatementKinds,
@@ -91,6 +95,9 @@ const requiredExpressionCommands = new Set<TokenKind>([
   'CLOSE',
 ])
 const binaryExpressionCommands = new Set<TokenKind>(['BEEP', 'OUT', 'POKE', 'OPEN'])
+const oligerSafeDoubleSlashCommands = new Set<TokenKind>(['SAVE', 'OUT', 'LOAD', 'IN', 'MERGE', 'RUN'])
+const oligerSafeBareCommands = new Set<TokenKind>(['LOAD', 'CAT', 'NEXT'])
+const oligerSafeFileTypeKinds = new Set<TokenKind>(['CODE', 'SCREEN', 'DATA', 'ABS', 'VAL'])
 const attributeControls = new Set<TokenKind>(['PAPER', 'INK', 'BRIGHT', 'FLASH', 'INVERSE', 'OVER'])
 const binaryOperators = new Set<TokenKind>([
   'EXPON',
@@ -423,11 +430,12 @@ export class Parser {
         continue
       }
 
-      if (!statementStarters.has(this.current().kind)) {
+      const isOligerSafeStatement = this.isOligerSafeStatementStart()
+      if (!statementStarters.has(this.current().kind) && !isOligerSafeStatement) {
         throw this.error(`Expected a statement but found ${this.describeCurrent()}.`, 'statement')
       }
 
-      if (!this.isStatementSupported(this.current().kind)) {
+      if (!isOligerSafeStatement && !this.isStatementSupported(this.current().kind)) {
         throw this.error(`${tokenKindDisplayName(this.current().kind)} is not supported by the ${this.dialectLabel()} dialect.`, 'statement')
       }
 
@@ -456,6 +464,10 @@ export class Parser {
 
   private parseStatement(): StatementNode {
     const current = this.current()
+
+    if (this.isOligerSafeStatementStart()) {
+      return this.parseOligerSafe()
+    }
 
     if (this.dialect === 'zx81' && current.kind === 'CLEAR') {
       const command = this.advance()
@@ -1239,6 +1251,280 @@ export class Parser {
     }
   }
 
+  private parseOligerSafe(): OligerSafeStatementNode {
+    const command = this.advance()
+    const items: OligerSafeItemNode[] = []
+
+    if (oligerSafeBareCommands.has(command.kind) && this.atStatementBoundary()) {
+      return {
+        type: 'OligerSafeStatement',
+        command: command.kind,
+        doubleSlash: false,
+        items,
+        span: command.span,
+      }
+    }
+
+    let endSpan = this.expect('DIV').span
+    let doubleSlash = false
+    if (oligerSafeDoubleSlashCommands.has(command.kind) && this.match('DIV')) {
+      doubleSlash = true
+      endSpan = this.previous().span
+    }
+
+    switch (command.kind) {
+      case 'LET':
+        this.parseOligerSafeLet(items)
+        break
+      case 'FORMAT':
+        this.parseOligerSafeExpression(items, 'string')
+        break
+      case 'CAT':
+        if (!this.atStatementBoundary()) {
+          const width = this.parseOligerSafeExpression(items, 'numeric')
+          this.expectOligerSafeLiteralRange(width, 0, 255, 'catalog width')
+        }
+        break
+      case 'COPY':
+      case 'GOSUB':
+        break
+      case 'FOR':
+        this.parseOligerSafeFor(items)
+        break
+      case 'SAVE':
+      case 'OUT':
+      case 'LOAD':
+      case 'IN':
+      case 'MERGE':
+      case 'RUN':
+        this.parseOligerSafeTransfer(command.kind, items)
+        break
+      case 'MOVE':
+      case 'RESTORE':
+      case 'ERASE':
+      case 'VERIFY':
+        this.parseOligerSafeManagement(command.kind, items)
+        break
+      default:
+        throw this.error(`Unsupported JLO SAFE statement ${tokenKindDisplayName(command.kind)}.`, 'JLO SAFE statement')
+    }
+
+    if (!this.atStatementBoundary()) {
+      throw this.error(`Expected ":" or end of line after JLO SAFE ${tokenKindDisplayName(command.kind)} but found ${this.describeCurrent()}.`, ['ENDOFSTAT', 'ENDOFLINE'])
+    }
+
+    if (items.length > 0) {
+      endSpan = items[items.length - 1].span
+    }
+
+    return {
+      type: 'OligerSafeStatement',
+      command: command.kind,
+      doubleSlash,
+      items,
+      span: joinSpans(command.span, endSpan),
+    }
+  }
+
+  private parseOligerSafeLet(items: OligerSafeItemNode[]): void {
+    const selector = this.expectOligerSafeLetter(['S', 'T', 'D', 'H', 'P'], 'SAFE setting')
+    items.push(this.oligerSafeTokenItem(selector))
+    items.push(this.oligerSafeTokenItem(this.expect('EQUAL')))
+
+    if (stringValue(selector).toUpperCase() !== 'P') {
+      const value = this.parseOligerSafeExpression(items, 'numeric')
+      const setting = stringValue(selector).toUpperCase()
+      const [minimum, maximum] = setting === 'S' ? [1, 2] : setting === 'T' ? [2, 255] : [0, 3]
+      this.expectOligerSafeLiteralRange(value, minimum, maximum, `${setting} setting`)
+      return
+    }
+
+    items.push(this.oligerSafeTokenItem(this.expectOligerSafeLetter(['T', 'O'], 'printer selection')))
+    if (this.match('DIV')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      items.push(this.oligerSafeTokenItem(this.expectOligerSafeLetter(['A', 'O', 'L', 'G', 'B'], 'copy protocol')))
+    }
+  }
+
+  private parseOligerSafeFor(items: OligerSafeItemNode[]): void {
+    this.parseOligerSafeExpression(items, 'numeric')
+    if (this.match('TO')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      this.parseOligerSafeExpression(items, 'numeric')
+    }
+  }
+
+  private parseOligerSafeTransfer(command: TokenKind, items: OligerSafeItemNode[]): void {
+    const expression = this.parseExpression()
+    const valueType = this.expressionValueType(expression)
+    items.push({ type: 'OligerSafeExpression', expression, span: expression.span })
+
+    if (valueType === 'numeric') {
+      if (command === 'MERGE') {
+        throw new ZxBasicSyntaxError('JLO SAFE MERGE requires a string file name.', this.current(), 'string expression')
+      }
+      if (command === 'SAVE' || command === 'OUT') {
+        this.expectOligerSafeLiteralRange(expression, 0, 0, 'file-zero save value')
+      } else {
+        this.expectOligerSafeLiteralRange(expression, 0, 255, 'legacy load value')
+      }
+      return
+    }
+
+    if (command === 'MERGE') {
+      return
+    }
+
+    if (command === 'RUN') {
+      items.push(this.oligerSafeTokenItem(this.expect('CODE')))
+      return
+    }
+
+    const isSave = command === 'SAVE' || command === 'OUT'
+    this.parseOligerSafeTransferSuffix(isSave, items)
+  }
+
+  private parseOligerSafeTransferSuffix(isSave: boolean, items: OligerSafeItemNode[]): void {
+    if (this.match('LINE')) {
+      if (!isSave) {
+        throw new ZxBasicSyntaxError('JLO SAFE LOAD and IN do not accept LINE.', this.previous(), 'load file type')
+      }
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      const line = this.parseOligerSafeExpression(items, 'numeric')
+      this.expectOligerSafeLiteralRange(line, 0, 9999, 'auto-run line')
+      return
+    }
+
+    if (this.match('CODE')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      if (isSave || this.canStartExpression(this.current().kind)) {
+        this.parseOligerSafeExpression(items, 'numeric')
+        if (this.match('COMMA')) {
+          items.push(this.oligerSafeTokenItem(this.previous()))
+          this.parseOligerSafeExpression(items, 'numeric')
+        } else if (isSave) {
+          throw this.error('JLO SAFE SAVE and OUT CODE require address and length.', ['COMMA'])
+        }
+      }
+      return
+    }
+
+    if (this.match('DATA')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      this.parseOligerSafeArrayDesignator(items)
+      return
+    }
+
+    if (this.match('SCREEN', 'VAL', 'ABS')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+    }
+  }
+
+  private parseOligerSafeArrayDesignator(items: OligerSafeItemNode[]): void {
+    const variable = this.expectVariableName()
+    this.expect('BEGINPAR')
+    const end = this.expect('ENDPAR')
+    items.push({
+      type: 'OligerSafeVariable',
+      name: stringValue(variable),
+      span: joinSpans(variable.span, end.span),
+    })
+  }
+
+  private parseOligerSafeManagement(command: TokenKind, items: OligerSafeItemNode[]): void {
+    if (command === 'MOVE' && this.atStatementBoundary()) {
+      return
+    }
+
+    if (command === 'RESTORE' && this.isBareOligerSafeResetSelector()) {
+      items.push(this.oligerSafeTokenItem(this.advance()))
+      return
+    }
+
+    this.parseOligerSafeExpression(items, 'string')
+    const hasFileType = this.parseOptionalOligerSafeFileType(items)
+
+    if (command === 'RESTORE') {
+      if (this.atStatementBoundary() && !hasFileType) {
+        return
+      }
+      items.push(this.oligerSafeTokenItem(this.expect('TO')))
+      this.parseOligerSafeExpression(items, 'string')
+      return
+    }
+
+    if (command === 'MOVE' && this.match('TO')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+      const drive = this.parseOligerSafeExpression(items, 'numeric')
+      this.expectOligerSafeLiteralRange(drive, 0, 3, 'destination drive')
+    }
+  }
+
+  private parseOptionalOligerSafeFileType(items: OligerSafeItemNode[]): boolean {
+    if (!oligerSafeFileTypeKinds.has(this.current().kind)) {
+      return false
+    }
+
+    const type = this.advance()
+    items.push(this.oligerSafeTokenItem(type))
+    if (type.kind === 'DATA' && this.match('DOLLAR')) {
+      items.push(this.oligerSafeTokenItem(this.previous()))
+    }
+    return true
+  }
+
+  private parseOligerSafeExpression(items: OligerSafeItemNode[], expectedType: ExpressionValueType): ExpressionNode {
+    const expression = this.parseExpression()
+    this.expectExpressionType(expression, expectedType)
+    items.push({ type: 'OligerSafeExpression', expression, span: expression.span })
+    return expression
+  }
+
+  private expectOligerSafeLiteralRange(expression: ExpressionNode, minimum: number, maximum: number, description: string): void {
+    const value = this.oligerSafeNumericLiteralValue(expression)
+    if (value === null || (value >= minimum && value <= maximum)) {
+      return
+    }
+
+    const range = minimum === maximum ? String(minimum) : `${minimum} to ${maximum}`
+    throw new ZxBasicSyntaxError(`JLO SAFE ${description} must be ${range}; found ${value}.`, this.current(), range)
+  }
+
+  private oligerSafeNumericLiteralValue(expression: ExpressionNode): number | null {
+    if (expression.type === 'NumberLiteral') {
+      return expression.value
+    }
+
+    if (expression.type === 'GroupedExpression' && expression.indexes.length === 0) {
+      return this.oligerSafeNumericLiteralValue(expression.expression)
+    }
+
+    if (expression.type === 'UnaryExpression' && (expression.operator === 'PLUS' || expression.operator === 'MINUS')) {
+      const operand = this.oligerSafeNumericLiteralValue(expression.operand)
+      if (operand !== null) {
+        return expression.operator === 'MINUS' ? -operand : operand
+      }
+    }
+
+    return null
+  }
+
+  private expectOligerSafeLetter(allowed: readonly string[], description: string): Token {
+    const token = this.expectVariableName()
+    if (!allowed.includes(stringValue(token).toUpperCase())) {
+      throw new ZxBasicSyntaxError(`Expected ${description} ${allowed.join(', ')} but found ${JSON.stringify(token.lexeme)}.`, token, description)
+    }
+    return token
+  }
+
+  private isBareOligerSafeResetSelector(): boolean {
+    return this.at('VARNAME') && stringValue(this.current()).toUpperCase() === 'S' && this.isStatementBoundaryKind(this.peek().kind)
+  }
+
+  private oligerSafeTokenItem(token: Token): OligerSafeItemNode {
+    return { type: 'OligerSafeToken', token: token.kind, lexeme: token.lexeme, span: token.span }
+  }
+
   private parseSpectranetStream(): SpectranetItemNode {
     const stream = this.expect('STREAM')
     const expression = this.parseExpression()
@@ -1806,6 +2092,19 @@ export class Parser {
     return !zx81OnlyStatementKinds.has(kind)
   }
 
+  private isOligerSafeStatementStart(): boolean {
+    if (!isOligerSafeEnabled(this.dialect, this.extensions)) {
+      return false
+    }
+
+    const kind = this.current().kind
+    if (oligerSafeSlashStatementKinds.has(kind) && this.peek().kind === 'DIV') {
+      return true
+    }
+
+    return oligerSafeBareCommands.has(kind) && this.isStatementBoundaryKind(this.peek().kind)
+  }
+
   private isExpressionKeywordMeaning(kind: TokenKind): boolean {
     if (this.dialect === 'zx81') {
       return zx81ExpressionKeywordMeanings.has(kind)
@@ -1912,7 +2211,11 @@ export class Parser {
   }
 
   private atStatementBoundary(): boolean {
-    return this.at('ENDOFSTAT') || this.at('ENDOFLINE') || this.at('ENDOFBASIC') || this.at('EOF')
+    return this.isStatementBoundaryKind(this.current().kind)
+  }
+
+  private isStatementBoundaryKind(kind: TokenKind): boolean {
+    return kind === 'ENDOFSTAT' || kind === 'ENDOFLINE' || kind === 'ENDOFBASIC' || kind === 'EOF'
   }
 
   private consumeRawDisplayControlSequences(): void {

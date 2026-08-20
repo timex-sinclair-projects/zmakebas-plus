@@ -149,7 +149,7 @@ function parseCommandLine(argv: readonly string[]): ParsedArgs {
     autostartLabel: options.autostartLabel,
     autostartLine: options.autostartLine,
     dialect: options.dialect,
-    extensions: options.dialect === 'zx81' ? [] : ['spectranet'],
+    extensions: options.dialect === 'zx81' ? [] : ['spectranet', 'oliger-safe'],
     inputFile: positional,
     labelIncrement: options.labelIncrement,
     labelMode: options.labelMode,

@@ -7,6 +7,7 @@ export const tokenKinds = [
   'ENDPAR',
   'COMMA',
   'SEMICOLON',
+  'DOLLAR',
   'STRINGLIT',
   'NUMLIT',
   'RAWBYTE',

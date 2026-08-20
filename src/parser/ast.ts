@@ -39,6 +39,7 @@ export type StatementNode =
   | SoundStatementNode
   | StorageStatementNode
   | SpectranetStatementNode
+  | OligerSafeStatementNode
 
 export type EmptyStatementNode = NodeBase & {
   readonly type: 'EmptyStatement'
@@ -205,6 +206,18 @@ export type SpectranetStatementNode = NodeBase & {
 export type SpectranetItemNode =
   | { readonly type: 'SpectranetExpression'; readonly expression: ExpressionNode; readonly span: SourceSpan }
   | { readonly type: 'SpectranetSeparator'; readonly separator: TokenKind; readonly span: SourceSpan }
+
+export type OligerSafeStatementNode = NodeBase & {
+  readonly type: 'OligerSafeStatement'
+  readonly command: TokenKind
+  readonly doubleSlash: boolean
+  readonly items: readonly OligerSafeItemNode[]
+}
+
+export type OligerSafeItemNode =
+  | { readonly type: 'OligerSafeExpression'; readonly expression: ExpressionNode; readonly span: SourceSpan }
+  | { readonly type: 'OligerSafeToken'; readonly token: TokenKind; readonly lexeme: string; readonly span: SourceSpan }
+  | { readonly type: 'OligerSafeVariable'; readonly name: string; readonly span: SourceSpan }
 
 export type ExpressionNode =
   | NumberLiteralNode
