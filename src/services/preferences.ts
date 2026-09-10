@@ -9,6 +9,7 @@ export type OptionsPaneSectionId = 'target' | 'export' | 'labels' | 'renumber' |
 export type OptionsPaneSectionCollapsedStates = Record<OptionsPaneSectionId, boolean>
 
 export interface IPreferenceValues {
+  readonly aercoFd68Enabled: boolean
   readonly automaticParsingEnabled: boolean
   readonly dialect: BasicDialect
   readonly labelIncrement: number
@@ -32,6 +33,7 @@ export interface IPreferenceValues {
 export type PreferenceKey = keyof IPreferenceValues
 
 export const preferenceDefaults: IPreferenceValues = {
+  aercoFd68Enabled: false,
   automaticParsingEnabled: true,
   dialect: defaultDialect,
   labelIncrement: 2,
@@ -73,6 +75,7 @@ export function loadPreferences(): IPreferenceValues {
   }
 
   return {
+    aercoFd68Enabled: readBooleanPreference(storedPreferences.aercoFd68Enabled, preferenceDefaults.aercoFd68Enabled),
     automaticParsingEnabled: readBooleanPreference(storedPreferences.automaticParsingEnabled, preferenceDefaults.automaticParsingEnabled),
     dialect: readDialectPreference(storedPreferences.dialect, preferenceDefaults.dialect),
     labelIncrement: readIntegerPreference(storedPreferences.labelIncrement, preferenceDefaults.labelIncrement, 1, 1000),

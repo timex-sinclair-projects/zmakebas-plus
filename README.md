@@ -117,7 +117,7 @@ On Windows, the executable is `zmakebas.exe`:
 .\zmakebas.exe -o hello.tap hello.bas
 ```
 
-By default, input is read from stdin and output is written to `out.tap`. Non-ZX81 mode accepts ZX Spectrum, Spectranet, and TS2068 syntax for compatibility with the original `zmakebas` token set. Use `-p` for ZX81 `.p` output, `-l` for label mode, `-r` for raw headerless Spectrum BASIC output, and `-3` for +3DOS output. The command line uses the same stricter validation as the web app, so invalid syntax that original `zmakebas` tokenized loosely may be rejected.
+By default, input is read from stdin and output is written to `out.tap`. Non-ZX81 mode accepts ZX Spectrum, Spectranet, TS2068, JLO SAFE, and AERCO FD-68 syntax for compatibility with the original `zmakebas` token set and supported disk-ROM extensions. Use `-p` for ZX81 `.p` output, `-l` for label mode, `-r` for raw headerless Spectrum BASIC output, and `-3` for +3DOS output. The command line uses the same stricter validation as the web app, so invalid syntax that original `zmakebas` tokenized loosely may be rejected.
 
 The release also includes a Node CLI bundle. Use that if you prefer to run the JavaScript CLI directly or need a platform-neutral download. It requires [Node.js](https://nodejs.org/en/download):
 

@@ -1,7 +1,7 @@
 import type { TokenKind } from './tokens'
 
 export type BasicDialect = 'spectrum' | 'ts2068' | 'zx81'
-export type BasicExtension = 'spectranet' | 'oliger-safe'
+export type BasicExtension = 'spectranet' | 'oliger-safe' | 'aerco-fd68'
 
 export const defaultDialect: BasicDialect = 'spectrum'
 
@@ -10,6 +10,7 @@ export const ts2068OnlyExpressionKeywordKinds = new Set<TokenKind>(['STICK', 'FR
 export const ts2068OnlyKeywordKinds = new Set<TokenKind>([...ts2068OnlyStatementKinds, ...ts2068OnlyExpressionKeywordKinds])
 
 export const zx81OnlyStatementKinds = new Set<TokenKind>(['UNPLOT', 'SCROLL', 'FAST', 'SLOW'])
+export const aercoFd68StatementKinds = new Set<TokenKind>(['CAT', 'FORMAT', 'MOVE', 'ERASE'])
 export const oligerSafeSlashStatementKinds = new Set<TokenKind>([
   'SAVE',
   'OUT',
@@ -74,6 +75,10 @@ export function isSpectranetEnabled(dialect: BasicDialect, extensions: readonly 
 
 export function isOligerSafeEnabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
   return dialect === 'ts2068' && isBasicExtensionEnabled(extensions, 'oliger-safe')
+}
+
+export function isAercoFd68Enabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
+  return dialect === 'ts2068' && isBasicExtensionEnabled(extensions, 'aerco-fd68')
 }
 
 export function dialectLabel(dialect: BasicDialect): string {

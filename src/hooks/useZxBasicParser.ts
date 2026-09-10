@@ -44,6 +44,7 @@ type UseZxBasicParserOptions = {
 }
 
 export type ZxBasicParserState = {
+  readonly aercoFd68Enabled: boolean
   readonly automaticParsingEnabled: boolean
   readonly dialect: BasicDialect
   readonly oligerSafeEnabled: boolean
@@ -57,6 +58,7 @@ export type ZxBasicParserState = {
   readonly sourceMap: LabelSourceMap | null
   readonly validAutostartLines: readonly number[]
   readonly requestParse: (source?: string) => void
+  readonly setAercoFd68Enabled: (enabled: boolean) => void
   readonly setDialect: (dialect: BasicDialect) => void
   readonly setOligerSafeEnabled: (enabled: boolean) => void
   readonly setSpectranetEnabled: (enabled: boolean) => void
@@ -68,6 +70,7 @@ export type ZxBasicParserState = {
 }
 
 export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingStart }: UseZxBasicParserOptions): ZxBasicParserState {
+  const [aercoFd68Enabled, setAercoFd68Enabled] = usePreference('aercoFd68Enabled')
   const [automaticParsingEnabled, setAutomaticParsingEnabled] = usePreference('automaticParsingEnabled')
   const [dialect, setDialect] = usePreference('dialect')
   const [oligerSafeEnabled, setOligerSafeEnabled] = usePreference('oligerSafeEnabled')
@@ -81,7 +84,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
     createParseRequest(
       {
         dialect,
-        extensions: extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled),
+        extensions: extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled, aercoFd68Enabled),
         labelIncrement,
         labelModeEnabled,
         labelStartLine,
@@ -96,7 +99,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
       createParseRequest(
         {
           dialect,
-          extensions: extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled),
+          extensions: extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled, aercoFd68Enabled),
           labelIncrement,
           labelModeEnabled,
           labelStartLine,
@@ -104,7 +107,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
         },
         revision,
       ),
-    [dialect, labelIncrement, labelModeEnabled, labelStartLine, oligerSafeEnabled, spectranetEnabled],
+    [aercoFd68Enabled, dialect, labelIncrement, labelModeEnabled, labelStartLine, oligerSafeEnabled, spectranetEnabled],
   )
 
   const requestParse = useCallback(
@@ -151,7 +154,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
     if (
       source === parseRequest.source &&
       dialect === parseRequest.dialect &&
-      arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled), parseRequest.extensions) &&
+      arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled, aercoFd68Enabled), parseRequest.extensions) &&
       labelModeEnabled === parseRequest.labelModeEnabled &&
       labelStartLine === parseRequest.labelStartLine &&
       labelIncrement === parseRequest.labelIncrement
@@ -166,7 +169,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
     const sourceChanged = source !== parseRequest.source
     const optionsChanged =
       dialect !== parseRequest.dialect ||
-      !arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled), parseRequest.extensions) ||
+      !arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled, aercoFd68Enabled), parseRequest.extensions) ||
       labelModeEnabled !== parseRequest.labelModeEnabled ||
       labelStartLine !== parseRequest.labelStartLine ||
       labelIncrement !== parseRequest.labelIncrement
@@ -178,6 +181,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
 
     return () => window.clearTimeout(parseTimer)
   }, [
+    aercoFd68Enabled,
     automaticParsingEnabled,
     dialect,
     labelIncrement,
@@ -201,7 +205,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
       isProcessing &&
       source === parseRequest.source &&
       dialect === parseRequest.dialect &&
-      arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled), parseRequest.extensions) &&
+      arraysEqual(extensionsFor(dialect, spectranetEnabled, oligerSafeEnabled, aercoFd68Enabled), parseRequest.extensions) &&
       labelModeEnabled === parseRequest.labelModeEnabled &&
       labelStartLine === parseRequest.labelStartLine &&
       labelIncrement === parseRequest.labelIncrement
@@ -209,6 +213,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
       onProcessingEnd()
     }
   }, [
+    aercoFd68Enabled,
     dialect,
     isProcessing,
     labelIncrement,
@@ -227,6 +232,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
   ])
 
   return {
+    aercoFd68Enabled,
     automaticParsingEnabled,
     dialect,
     oligerSafeEnabled,
@@ -237,6 +243,7 @@ export function useZxBasicParser({ isProcessing, onProcessingEnd, onProcessingSt
     parseState: processedParse.parseState,
     parsedSource: parseRequest.source,
     requestParse,
+    setAercoFd68Enabled,
     setAutomaticParsingEnabled,
     setDialect,
     setOligerSafeEnabled,
@@ -288,12 +295,15 @@ function createParseFailureState(error: unknown, sourceMap: LabelSourceMap | nul
   }
 }
 
-function extensionsFor(dialect: BasicDialect, spectranetEnabled: boolean, oligerSafeEnabled: boolean): readonly BasicExtension[] {
+function extensionsFor(dialect: BasicDialect, spectranetEnabled: boolean, oligerSafeEnabled: boolean, aercoFd68Enabled: boolean): readonly BasicExtension[] {
   if (dialect === 'spectrum' && spectranetEnabled) {
     return ['spectranet']
   }
-  if (dialect === 'ts2068' && oligerSafeEnabled) {
-    return ['oliger-safe']
+  if (dialect === 'ts2068') {
+    const extensions: BasicExtension[] = []
+    if (oligerSafeEnabled) extensions.push('oliger-safe')
+    if (aercoFd68Enabled) extensions.push('aerco-fd68')
+    return extensions
   }
   return []
 }

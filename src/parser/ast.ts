@@ -40,6 +40,7 @@ export type StatementNode =
   | StorageStatementNode
   | SpectranetStatementNode
   | OligerSafeStatementNode
+  | AercoFd68StatementNode
 
 export type EmptyStatementNode = NodeBase & {
   readonly type: 'EmptyStatement'
@@ -218,6 +219,24 @@ export type OligerSafeItemNode =
   | { readonly type: 'OligerSafeExpression'; readonly expression: ExpressionNode; readonly span: SourceSpan }
   | { readonly type: 'OligerSafeToken'; readonly token: TokenKind; readonly lexeme: string; readonly span: SourceSpan }
   | { readonly type: 'OligerSafeVariable'; readonly name: string; readonly span: SourceSpan }
+
+export type AercoFd68Extension = 'BAS' | 'DAT' | 'CHR' | 'BIN' | 'SCR' | 'ARO' | 'LRO' | 'BUT' | 'VAR'
+
+export type AercoFd68StatementNode = NodeBase & {
+  readonly type: 'AercoFd68Statement'
+  readonly command: 'CAT' | 'FORMAT' | 'MOVE' | 'ERASE'
+  readonly field: AercoFd68FieldNode
+  readonly separatorSpan: SourceSpan
+  readonly parameters: readonly NumberLiteralNode[]
+}
+
+export type AercoFd68FieldNode =
+  | { readonly type: 'AercoFd68DirectoryField'; readonly value: ''; readonly span: SourceSpan }
+  | { readonly type: 'AercoFd68DriveField'; readonly drive: string; readonly value: string; readonly span: SourceSpan }
+  | { readonly type: 'AercoFd68FileField'; readonly drive: string | null; readonly name: string; readonly extension: AercoFd68Extension; readonly value: string; readonly span: SourceSpan }
+  | { readonly type: 'AercoFd68VariableField'; readonly variable: string; readonly value: string; readonly span: SourceSpan }
+  | { readonly type: 'AercoFd68RepeatField'; readonly value: '!'; readonly span: SourceSpan }
+  | { readonly type: 'AercoFd68DiskCopyField'; readonly destinationDrive: string; readonly sourceDrive: string; readonly value: string; readonly span: SourceSpan }
 
 export type ExpressionNode =
   | NumberLiteralNode

@@ -39,6 +39,7 @@ const formatterKeywordCaseOptions: readonly RadioSelectionOption<FormatKeywordCa
 ]
 
 type ParserOptionsPaneProps = {
+  readonly aercoFd68Enabled: boolean
   readonly automaticParsingEnabled: boolean
   readonly canShowDiagnostics: boolean
   readonly dialect: BasicDialect
@@ -55,6 +56,7 @@ type ParserOptionsPaneProps = {
   readonly oligerSafeEnabled: boolean
   readonly spectranetEnabled: boolean
   readonly programExportFormat: ProgramExportFormat
+  readonly onAercoFd68EnabledChange: (enabled: boolean) => void
   readonly onAutomaticParsingEnabledChange: (enabled: boolean) => void
   readonly onDiagnosticsOpenChange: (open: boolean) => void
   readonly onDialectChange: (dialect: BasicDialect) => void
@@ -74,6 +76,7 @@ type ParserOptionsPaneProps = {
 }
 
 export function ParserOptionsPane({
+  aercoFd68Enabled,
   automaticParsingEnabled,
   canShowDiagnostics,
   dialect,
@@ -90,6 +93,7 @@ export function ParserOptionsPane({
   oligerSafeEnabled,
   spectranetEnabled,
   programExportFormat,
+  onAercoFd68EnabledChange,
   onAutomaticParsingEnabledChange,
   onDiagnosticsOpenChange,
   onDialectChange,
@@ -154,6 +158,15 @@ export function ParserOptionsPane({
             checked={dialect === 'ts2068' && oligerSafeEnabled}
             disabled={dialect !== 'ts2068'}
             onChange={(event) => onOligerSafeEnabledChange(event.currentTarget.checked)}
+          />
+          <Form.Check
+            className="option-check"
+            type="checkbox"
+            id="aerco-fd68-enabled"
+            label="AERCO Disk"
+            checked={dialect === 'ts2068' && aercoFd68Enabled}
+            disabled={dialect !== 'ts2068'}
+            onChange={(event) => onAercoFd68EnabledChange(event.currentTarget.checked)}
           />
         </CollapsibleOptionGroup>
 

@@ -1,4 +1,7 @@
 import type {
+  AercoFd68Extension,
+  AercoFd68FieldNode,
+  AercoFd68StatementNode,
   BinaryCommandStatementNode,
   BinaryExpressionNode,
   TapeStatementNode,
@@ -19,6 +22,7 @@ import type {
   LetStatementNode,
   LineNode,
   NextStatementNode,
+  NumberLiteralNode,
   OnErrStatementNode,
   OligerSafeItemNode,
   OligerSafeStatementNode,
@@ -42,8 +46,10 @@ import type {
   VariableNode,
 } from './ast'
 import {
+  aercoFd68StatementKinds,
   defaultDialect,
   dialectLabel,
+  isAercoFd68Enabled,
   isOligerSafeEnabled,
   isSpectranetEnabled,
   isSpectrumFamilyDialect,
@@ -98,6 +104,10 @@ const binaryExpressionCommands = new Set<TokenKind>(['BEEP', 'OUT', 'POKE', 'OPE
 const oligerSafeDoubleSlashCommands = new Set<TokenKind>(['SAVE', 'OUT', 'LOAD', 'IN', 'MERGE', 'RUN'])
 const oligerSafeBareCommands = new Set<TokenKind>(['LOAD', 'CAT', 'NEXT'])
 const oligerSafeFileTypeKinds = new Set<TokenKind>(['CODE', 'SCREEN', 'DATA', 'ABS', 'VAL'])
+const aercoFd68Extensions = new Set<AercoFd68Extension>(['BAS', 'DAT', 'CHR', 'BIN', 'SCR', 'ARO', 'LRO', 'BUT', 'VAR'])
+const aercoFd68ExtensionDisplayList = '.BAS, .DAT, .CHR, .BIN, .SCR, .ARO, .LRO, .BUT, or .VAR'
+const aercoFd68CatNoParameterExtensions = new Set<AercoFd68Extension>(['SCR', 'ARO', 'LRO', 'VAR'])
+const aercoFd68MoveNoParameterExtensions = new Set<AercoFd68Extension>(['SCR', 'ARO', 'BUT', 'VAR'])
 const attributeControls = new Set<TokenKind>(['PAPER', 'INK', 'BRIGHT', 'FLASH', 'INVERSE', 'OVER'])
 const binaryOperators = new Set<TokenKind>([
   'EXPON',
@@ -467,6 +477,14 @@ export class Parser {
 
     if (this.isOligerSafeStatementStart()) {
       return this.parseOligerSafe()
+    }
+
+    if (this.isAercoFd68StatementStart()) {
+      const nativeStorage = this.tryParseCompleteTs2068Storage()
+      if (nativeStorage) {
+        return nativeStorage
+      }
+      return this.parseAercoFd68()
     }
 
     if (this.dialect === 'zx81' && current.kind === 'CLEAR') {
@@ -1078,11 +1096,15 @@ export class Parser {
 
   private parseStorage(): StorageStatementNode {
     if (this.dialect === 'ts2068') {
+      const command = this.current().kind
       const ts2068Storage = this.tryParseTs2068Storage()
       if (ts2068Storage) {
         return ts2068Storage
       }
-      throw this.error(`Expected two string operands for TS2068 ${this.current().kind}.`, 'string expression, string expression')
+      if (isAercoFd68Enabled(this.dialect, this.extensions) && aercoFd68StatementKinds.has(command)) {
+        throw this.error(`Expected AERCO FD-68 ${command} with a quoted field and trailing comma, or two string operands for native TS2068 ${command}.`, 'AERCO FD-68 field or two string expressions')
+      }
+      throw this.error(`Expected two string operands for TS2068 ${command}.`, 'string expression, string expression')
     }
 
     const command = this.advance()
@@ -1249,6 +1271,257 @@ export class Parser {
       items,
       span: spanThroughChildren(command.span, items),
     }
+  }
+
+  private tryParseCompleteTs2068Storage(): StorageStatementNode | null {
+    const startCursor = this.cursor
+    const statement = this.tryParseTs2068Storage()
+    if (statement && this.atStatementBoundary()) {
+      return statement
+    }
+
+    this.cursor = startCursor
+    return null
+  }
+
+  private parseAercoFd68(): AercoFd68StatementNode {
+    const command = this.advance()
+    const aercoCommand = command.kind as AercoFd68StatementNode['command']
+    const fieldToken = this.expect('STRINGLIT')
+    const field = this.parseAercoFd68Field(fieldToken, aercoCommand)
+    if (!this.at('COMMA')) {
+      throw this.error(`AERCO FD-68 ${aercoCommand} requires a trailing comma after its quoted field; found ${this.describeCurrent()}.`, ['COMMA'])
+    }
+    const separator = this.advance()
+    const parameters: NumberLiteralNode[] = []
+
+    if (this.at('NUMLIT')) {
+      parameters.push(this.parseAercoFd68Parameter())
+      while (this.match('COMMA')) {
+        parameters.push(this.parseAercoFd68Parameter())
+      }
+    }
+
+    this.validateAercoFd68Statement(aercoCommand, field, parameters)
+
+    if (!this.atStatementBoundary()) {
+      throw this.error(`Expected ":" or end of line after AERCO FD-68 ${aercoCommand} but found ${this.describeCurrent()}.`, ['ENDOFSTAT', 'ENDOFLINE'])
+    }
+
+    return {
+      type: 'AercoFd68Statement',
+      command: aercoCommand,
+      field,
+      separatorSpan: separator.span,
+      parameters,
+      span: joinSpans(command.span, parameters.at(-1)?.span ?? separator.span),
+    }
+  }
+
+  private parseAercoFd68Field(token: Token, command: AercoFd68StatementNode['command']): AercoFd68FieldNode {
+    const value = stringValue(token)
+    const upperValue = value.toUpperCase()
+
+    if (value === '') {
+      return { type: 'AercoFd68DirectoryField', value: '', span: token.span }
+    }
+
+    if (command === 'FORMAT') {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 FORMAT requires the empty quoted field ""; found ${JSON.stringify(value)}.`, token, 'FORMAT "",')
+    }
+
+    const diskCopy = /^([A-D]):=([A-D]):$/i.exec(value)
+    if (diskCopy) {
+      return {
+        type: 'AercoFd68DiskCopyField',
+        destinationDrive: diskCopy[1].toUpperCase(),
+        sourceDrive: diskCopy[2].toUpperCase(),
+        value,
+        span: token.span,
+      }
+    }
+
+    if (/^[A-D]:$/i.test(value)) {
+      return { type: 'AercoFd68DriveField', drive: upperValue[0], value, span: token.span }
+    }
+
+    if (value === '!') {
+      return { type: 'AercoFd68RepeatField', value: '!', span: token.span }
+    }
+
+    if (/^[A-Z]\$$/i.test(value)) {
+      return { type: 'AercoFd68VariableField', variable: upperValue, value, span: token.span }
+    }
+
+    const specialBut = /^(?:([A-D]):)?\.BUT$/i.exec(value)
+    if (specialBut) {
+      return {
+        type: 'AercoFd68FileField',
+        drive: specialBut[1]?.toUpperCase() ?? null,
+        name: '',
+        extension: 'BUT',
+        value,
+        span: token.span,
+      }
+    }
+
+    const file = /^(?:([A-D]):)?([^",.:=]{1,10})\.([A-Z]{3})$/i.exec(value)
+    const extension = file?.[3].toUpperCase() as AercoFd68Extension | undefined
+    if (!file || !extension) {
+      this.throwAercoFd68FieldSyntaxError(token, value)
+    }
+    if (!aercoFd68Extensions.has(extension)) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 does not recognize file extension ${JSON.stringify(`.${extension}`)}. Expected one of ${aercoFd68ExtensionDisplayList}.`, token, aercoFd68ExtensionDisplayList)
+    }
+
+    return {
+      type: 'AercoFd68FileField',
+      drive: file[1]?.toUpperCase() ?? null,
+      name: file[2],
+      extension,
+      value,
+      span: token.span,
+    }
+  }
+
+  private throwAercoFd68FieldSyntaxError(token: Token, value: string): never {
+    if (value.includes('=')) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 disk-copy field must use "destination:=source:" with drives A through D, for example "A:=B:"; found ${JSON.stringify(value)}.`, token, '"A:=B:"')
+    }
+
+    if (value.endsWith('$')) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 string-variable indirection must be one letter followed by $, for example "X$"; found ${JSON.stringify(value)}.`, token, 'one-letter string variable')
+    }
+
+    const drivePrefix = /^([A-Z]):/i.exec(value)
+    if (drivePrefix && !/^[A-D]$/i.test(drivePrefix[1])) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 drive must be A:, B:, C:, or D:; found ${JSON.stringify(`${drivePrefix[1]}:`)}.`, token, 'drive A: through D:')
+    }
+
+    const fileValue = /^[A-D]:/i.test(value) ? value.slice(2) : value
+    if (/[",:=]/.test(fileValue)) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file names cannot contain quotes, commas, colons, or equals signs; found ${JSON.stringify(value)}.`, token, 'name.extension')
+    }
+
+    const firstDot = fileValue.indexOf('.')
+    const lastDot = fileValue.lastIndexOf('.')
+    if (firstDot < 0) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file field ${JSON.stringify(value)} must use name.extension with a three-letter extension, for example "FIRST.SCR".`, token, 'name.extension')
+    }
+    if (firstDot !== lastDot) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file field ${JSON.stringify(value)} must contain exactly one period between its name and extension.`, token, 'name.extension')
+    }
+
+    const name = fileValue.slice(0, firstDot)
+    const extension = fileValue.slice(firstDot)
+    if (name.length === 0) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file names must contain 1 to 10 characters before the extension; only the special ".BUT" catalog field may omit the name.`, token, '1 to 10 character file name')
+    }
+    if (name.length > 10) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file name ${JSON.stringify(name)} is ${name.length} characters; the name before the extension must be 1 to 10 characters.`, token, '1 to 10 character file name')
+    }
+    if (!/^\.[A-Z]{3}$/i.test(extension)) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 file extension ${JSON.stringify(extension)} must contain exactly three letters. Expected one of ${aercoFd68ExtensionDisplayList}.`, token, aercoFd68ExtensionDisplayList)
+    }
+
+    throw new ZxBasicSyntaxError(`Invalid AERCO FD-68 field ${JSON.stringify(value)}. Expected a file, drive, one-letter string variable, "!", empty field, or disk-copy field.`, token, 'FD-68 field')
+  }
+
+  private parseAercoFd68Parameter(): NumberLiteralNode {
+    const token = this.expect('NUMLIT')
+    const value = numberValue(token)
+    if (!/^\d+$/.test(token.lexeme) || !Number.isInteger(value) || value < 0 || value > 0xffff) {
+      throw new ZxBasicSyntaxError(`AERCO FD-68 parameters must be unsigned decimal integers from 0 to 65535; found ${JSON.stringify(token.lexeme)}.`, token, 'unsigned decimal integer')
+    }
+    return { type: 'NumberLiteral', value, raw: token.lexeme, span: token.span }
+  }
+
+  private validateAercoFd68Statement(command: AercoFd68StatementNode['command'], field: AercoFd68FieldNode, parameters: readonly NumberLiteralNode[]): void {
+    if (field.type === 'AercoFd68DirectoryField') {
+      if ((command !== 'CAT' && command !== 'FORMAT') || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'an empty directory field without parameters')
+      }
+      return
+    }
+
+    if (field.type === 'AercoFd68DriveField') {
+      if (command !== 'CAT' || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'a CAT drive field without parameters')
+      }
+      return
+    }
+
+    if (field.type === 'AercoFd68RepeatField') {
+      if (command !== 'CAT' || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'CAT "!",')
+      }
+      return
+    }
+
+    if (field.type === 'AercoFd68DiskCopyField') {
+      if ((command !== 'CAT' && command !== 'MOVE') || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'CAT or MOVE disk copy without parameters')
+      }
+      return
+    }
+
+    if (field.type === 'AercoFd68VariableField') {
+      if (command === 'FORMAT' || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'CAT, MOVE, or ERASE string-variable indirection without parameters')
+      }
+      return
+    }
+
+    this.validateAercoFd68FileStatement(command, field, parameters)
+  }
+
+  private validateAercoFd68FileStatement(command: AercoFd68StatementNode['command'], field: Extract<AercoFd68FieldNode, { readonly type: 'AercoFd68FileField' }>, parameters: readonly NumberLiteralNode[]): void {
+    if (command === 'FORMAT') {
+      this.throwAercoFd68FormError(command, field, 'FORMAT "",')
+    }
+
+    if (command === 'ERASE') {
+      if (field.name.length === 0 || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'a named recognized file without parameters')
+      }
+      return
+    }
+
+    const allowedWithoutParameters = command === 'CAT' ? aercoFd68CatNoParameterExtensions : aercoFd68MoveNoParameterExtensions
+
+    if (field.extension === 'BUT' && command === 'CAT') {
+      if (field.name.length !== 0 || parameters.length !== 0) {
+        this.throwAercoFd68FormError(command, field, 'the special .BUT catalog field without parameters')
+      }
+      return
+    }
+
+    if (field.extension === 'BAS') {
+      if (parameters.length > 1) {
+        this.throwAercoFd68FormError(command, field, 'zero or one decimal line/address parameter')
+      }
+      return
+    }
+
+    if (field.extension === 'BIN') {
+      if (command === 'CAT' && parameters.length <= 1) {
+        return
+      }
+      if (command === 'MOVE' && parameters.length === 2 && parameters.every((parameter) => parameter.value !== 0)) {
+        return
+      }
+      this.throwAercoFd68FormError(command, field, command === 'MOVE' ? 'exactly two non-zero decimal address/length parameters' : 'zero or one decimal relocation parameter')
+    }
+
+    if (allowedWithoutParameters.has(field.extension) && parameters.length === 0 && field.name.length > 0) {
+      return
+    }
+
+    this.throwAercoFd68FormError(command, field, `a file type supported by ${command} with its required parameter count`)
+  }
+
+  private throwAercoFd68FormError(command: AercoFd68StatementNode['command'], field: AercoFd68FieldNode, expected: string): never {
+    throw new ZxBasicSyntaxError(`AERCO FD-68 ${command} does not support field ${JSON.stringify(field.value)} with this parameter list; expected ${expected}.`, this.current(), expected)
   }
 
   private parseOligerSafe(): OligerSafeStatementNode {
@@ -2103,6 +2376,13 @@ export class Parser {
     }
 
     return oligerSafeBareCommands.has(kind) && this.isStatementBoundaryKind(this.peek().kind)
+  }
+
+  private isAercoFd68StatementStart(): boolean {
+    const field = this.peek()
+    return isAercoFd68Enabled(this.dialect, this.extensions)
+      && aercoFd68StatementKinds.has(this.current().kind)
+      && field.kind === 'STRINGLIT'
   }
 
   private isExpressionKeywordMeaning(kind: TokenKind): boolean {

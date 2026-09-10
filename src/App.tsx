@@ -37,6 +37,7 @@ function App() {
   const startTapeRedecodeProcessing = useCallback(() => startProcessing('tape-redecode'), [startProcessing])
   const stopTapeRedecodeProcessing = useCallback(() => stopProcessing('tape-redecode'), [stopProcessing])
   const {
+    aercoFd68Enabled,
     automaticParsingEnabled,
     dialect,
     oligerSafeEnabled,
@@ -46,6 +47,7 @@ function App() {
     parseState,
     parsedSource,
     requestParse,
+    setAercoFd68Enabled,
     setAutomaticParsingEnabled,
     setDialect,
     setOligerSafeEnabled,
@@ -84,9 +86,14 @@ function App() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const extensions = useMemo<readonly BasicExtension[]>(() => {
     if (dialect === 'spectrum' && spectranetEnabled) return ['spectranet']
-    if (dialect === 'ts2068' && oligerSafeEnabled) return ['oliger-safe']
+    if (dialect === 'ts2068') {
+      const selected: BasicExtension[] = []
+      if (oligerSafeEnabled) selected.push('oliger-safe')
+      if (aercoFd68Enabled) selected.push('aerco-fd68')
+      return selected
+    }
     return []
-  }, [dialect, oligerSafeEnabled, spectranetEnabled])
+  }, [aercoFd68Enabled, dialect, oligerSafeEnabled, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
   const programFilesRef = useRef<ProgramFilesState | null>(null)
@@ -392,6 +399,14 @@ function App() {
     clearNavigation()
   }
 
+  function handleAercoFd68EnabledChange(nextEnabled: boolean): void {
+    if (automaticParsingEnabled) {
+      startParserProcessing()
+    }
+    setAercoFd68Enabled(nextEnabled)
+    clearNavigation()
+  }
+
   function commitSource(nextSource: string, options: SourceCommitOptions = {}): void {
     const {
       clearNavigationAfterCommit = false,
@@ -495,6 +510,7 @@ function App() {
             <Collapse in={!optionsCollapsed} dimension="width" mountOnEnter unmountOnExit>
               <div className="options-pane-collapse">
                 <ParserOptionsPane
+                  aercoFd68Enabled={aercoFd68Enabled}
                   automaticParsingEnabled={automaticParsingEnabled}
                   canShowDiagnostics={parseState.ok}
                   dialect={dialect}
@@ -511,6 +527,7 @@ function App() {
                   oligerSafeEnabled={oligerSafeEnabled}
                   spectranetEnabled={spectranetEnabled}
                   programExportFormat={programExportFormat}
+                  onAercoFd68EnabledChange={handleAercoFd68EnabledChange}
                   onAutomaticParsingEnabledChange={handleAutomaticParsingEnabledChange}
                   onDiagnosticsOpenChange={handleShowResultsChange}
                   onDialectChange={handleDialectChange}
