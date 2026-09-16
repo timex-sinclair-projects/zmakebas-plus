@@ -1602,8 +1602,12 @@ export class Parser {
   }
 
   private tokenForExpression(expression: ExpressionNode): Token {
-    const startToken = this.tokens.find((token) => token.span.start.offset === expression.span.start.offset)
-    return { ...(startToken ?? this.current()), span: expression.span }
+    return this.tokenForSpan(expression.span)
+  }
+
+  private tokenForSpan(span: SourceSpan): Token {
+    const startToken = this.tokens.find((token) => token.span.start.offset === span.start.offset)
+    return { ...(startToken ?? this.current()), span }
   }
 
   private numericLiteralValue(expression: ExpressionNode): number | null {
@@ -1806,35 +1810,50 @@ export class Parser {
   private validateAercoFd68Statement(command: AercoFd68StatementNode['command'], field: AercoFd68FieldNode, parameters: readonly NumberLiteralNode[]): void {
     if (field.type === 'AercoFd68DirectoryField') {
       if ((command !== 'CAT' && command !== 'FORMAT') || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'an empty directory field without parameters')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'an empty directory field without parameters',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
 
     if (field.type === 'AercoFd68DriveField') {
       if (command !== 'CAT' || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'a CAT drive field without parameters')
+        this.throwAercoFd68FormError(command, field, 'a CAT drive field without parameters', parameters[parameters.length - 1])
       }
       return
     }
 
     if (field.type === 'AercoFd68RepeatField') {
       if (command !== 'CAT' || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'CAT "!",')
+        this.throwAercoFd68FormError(command, field, 'CAT "!",', parameters[parameters.length - 1])
       }
       return
     }
 
     if (field.type === 'AercoFd68DiskCopyField') {
       if ((command !== 'CAT' && command !== 'MOVE') || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'CAT or MOVE disk copy without parameters')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'CAT or MOVE disk copy without parameters',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
 
     if (field.type === 'AercoFd68VariableField') {
       if (command === 'FORMAT' || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'CAT, MOVE, or ERASE string-variable indirection without parameters')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'CAT, MOVE, or ERASE string-variable indirection without parameters',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
@@ -1844,12 +1863,17 @@ export class Parser {
 
   private validateAercoFd68FileStatement(command: AercoFd68StatementNode['command'], field: Extract<AercoFd68FieldNode, { readonly type: 'AercoFd68FileField' }>, parameters: readonly NumberLiteralNode[]): void {
     if (command === 'FORMAT') {
-      this.throwAercoFd68FormError(command, field, 'FORMAT "",')
+      this.throwAercoFd68FormError(command, field, 'FORMAT "",', parameters[parameters.length - 1])
     }
 
     if (command === 'ERASE') {
       if (field.name.length === 0 || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'a named recognized file without parameters')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'a named recognized file without parameters',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
@@ -1858,14 +1882,24 @@ export class Parser {
 
     if (field.extension === 'BUT' && command === 'CAT') {
       if (field.name.length !== 0 || parameters.length !== 0) {
-        this.throwAercoFd68FormError(command, field, 'the special .BUT catalog field without parameters')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'the special .BUT catalog field without parameters',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
 
     if (field.extension === 'BAS') {
       if (parameters.length > 1) {
-        this.throwAercoFd68FormError(command, field, 'zero or one decimal line/address parameter')
+        this.throwAercoFd68FormError(
+          command,
+          field,
+          'zero or one decimal line/address parameter',
+          parameters[parameters.length - 1],
+        )
       }
       return
     }
@@ -1877,18 +1911,40 @@ export class Parser {
       if (command === 'MOVE' && parameters.length === 2 && parameters.every((parameter) => parameter.value !== 0)) {
         return
       }
-      this.throwAercoFd68FormError(command, field, command === 'MOVE' ? 'exactly two non-zero decimal address/length parameters' : 'zero or one decimal relocation parameter')
+      const invalidParameter = parameters.length > (command === 'MOVE' ? 2 : 1)
+        ? parameters[parameters.length - 1]
+        : parameters.find((parameter) => parameter.value === 0)
+      this.throwAercoFd68FormError(
+        command,
+        field,
+        command === 'MOVE' ? 'exactly two non-zero decimal address/length parameters' : 'zero or one decimal relocation parameter',
+        invalidParameter,
+      )
     }
 
     if (allowedWithoutParameters.has(field.extension) && parameters.length === 0 && field.name.length > 0) {
       return
     }
 
-    this.throwAercoFd68FormError(command, field, `a file type supported by ${command} with its required parameter count`)
+    this.throwAercoFd68FormError(
+      command,
+      field,
+      `a file type supported by ${command} with its required parameter count`,
+      parameters[parameters.length - 1],
+    )
   }
 
-  private throwAercoFd68FormError(command: AercoFd68StatementNode['command'], field: AercoFd68FieldNode, expected: string): never {
-    throw new ZxBasicSyntaxError(`AERCO FD-68 ${command} does not support field ${JSON.stringify(field.value)} with this parameter list; expected ${expected}.`, this.current(), expected)
+  private throwAercoFd68FormError(
+    command: AercoFd68StatementNode['command'],
+    field: AercoFd68FieldNode,
+    expected: string,
+    invalidParameter?: NumberLiteralNode,
+  ): never {
+    throw new ZxBasicSyntaxError(
+      `AERCO FD-68 ${command} does not support field ${JSON.stringify(field.value)} with this parameter list; expected ${expected}.`,
+      invalidParameter ? this.tokenForExpression(invalidParameter) : this.current(),
+      expected,
+    )
   }
 
   private parseOligerSafe(): OligerSafeStatementNode {
@@ -2001,7 +2057,11 @@ export class Parser {
 
     if (valueType === 'numeric') {
       if (command === 'MERGE') {
-        throw new ZxBasicSyntaxError('JLO SAFE MERGE requires a string file name.', this.current(), 'string expression')
+        throw new ZxBasicSyntaxError(
+          'JLO SAFE MERGE requires a string file name.',
+          this.tokenForExpression(expression),
+          'string expression',
+        )
       }
       if (command === 'SAVE' || command === 'OUT') {
         this.expectOligerSafeLiteralRange(expression, 0, 0, 'file-zero save value')
@@ -2127,7 +2187,11 @@ export class Parser {
     }
 
     const range = minimum === maximum ? String(minimum) : `${minimum} to ${maximum}`
-    throw new ZxBasicSyntaxError(`JLO SAFE ${description} must be ${range}; found ${value}.`, this.current(), range)
+    throw new ZxBasicSyntaxError(
+      `JLO SAFE ${description} must be ${range}; found ${value}.`,
+      this.tokenForExpression(expression),
+      range,
+    )
   }
 
   private oligerSafeNumericLiteralValue(expression: ExpressionNode): number | null {
@@ -2586,13 +2650,21 @@ export class Parser {
 
   private expectNumericArraySubscript(index: IndexNode): void {
     if (!index.from || index.isSlice) {
-      throw this.error('Numeric array subscripts must be scalar expressions.', 'numeric array subscript')
+      throw new ZxBasicSyntaxError(
+        'Numeric array subscripts must be scalar expressions.',
+        this.tokenForSpan(index.span),
+        'numeric array subscript',
+      )
     }
   }
 
   private expectStringArraySubscript(index: IndexNode): void {
     if (!index.from || index.isSlice) {
-      throw this.error('String array subscripts before a comma must be scalar expressions.', 'string array subscript')
+      throw new ZxBasicSyntaxError(
+        'String array subscripts before a comma must be scalar expressions.',
+        this.tokenForSpan(index.span),
+        'string array subscript',
+      )
     }
   }
 
@@ -2633,7 +2705,11 @@ export class Parser {
   private expectExpressionType(expression: ExpressionNode, expected: ExpressionValueType): void {
     const actual = this.expressionValueType(expression)
     if (actual !== expected) {
-      throw new ZxBasicSyntaxError(`Expected a ${expected} expression but found a ${actual} expression.`, this.current(), `${expected} expression`)
+      throw new ZxBasicSyntaxError(
+        `Expected a ${expected} expression but found a ${actual} expression.`,
+        this.tokenForExpression(expression),
+        `${expected} expression`,
+      )
     }
   }
 
