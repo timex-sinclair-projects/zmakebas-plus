@@ -41,6 +41,7 @@ export type StatementNode =
   | SpectranetStatementNode
   | OligerSafeStatementNode
   | AercoFd68StatementNode
+  | LarkenLkdosStatementNode
 
 export type EmptyStatementNode = NodeBase & {
   readonly type: 'EmptyStatement'
@@ -237,6 +238,13 @@ export type AercoFd68FieldNode =
   | { readonly type: 'AercoFd68VariableField'; readonly variable: string; readonly value: string; readonly span: SourceSpan }
   | { readonly type: 'AercoFd68RepeatField'; readonly value: '!'; readonly span: SourceSpan }
   | { readonly type: 'AercoFd68DiskCopyField'; readonly destinationDrive: string; readonly sourceDrive: string; readonly value: string; readonly span: SourceSpan }
+
+export type LarkenLkdosStatementNode = NodeBase & {
+  readonly type: 'LarkenLkdosStatement'
+  readonly dispatch: 'usr-100' | 'stream-4'
+  readonly command: TokenKind
+  readonly statement: Exclude<StatementNode, LarkenLkdosStatementNode>
+}
 
 export type ExpressionNode =
   | NumberLiteralNode

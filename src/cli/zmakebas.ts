@@ -149,7 +149,7 @@ function parseCommandLine(argv: readonly string[]): ParsedArgs {
     autostartLabel: options.autostartLabel,
     autostartLine: options.autostartLine,
     dialect: options.dialect,
-    extensions: options.dialect === 'zx81' ? [] : ['spectranet', 'oliger-safe', 'aerco-fd68'],
+    extensions: options.dialect === 'zx81' ? [] : ['spectranet', 'oliger-safe', 'aerco-fd68', 'larken-lkdos'],
     inputFile: positional,
     labelIncrement: options.labelIncrement,
     labelMode: options.labelMode,
@@ -375,7 +375,7 @@ usage: zmakebas [-hlp3rv] [-a line] [-i incr] [-n speccy_filename]
         -s      in labels mode, set starting line number (default 10).
 
 Default non-ZX81 mode accepts ZX Spectrum, Spectranet, TS2068, JLO SAFE,
-and AERCO FD-68 syntax.
+AERCO FD-68, and Larken LKDOS syntax.
 `
 }
 

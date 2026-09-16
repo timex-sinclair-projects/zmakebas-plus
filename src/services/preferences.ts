@@ -15,6 +15,7 @@ export interface IPreferenceValues {
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
+  readonly larkenLkdosEnabled: boolean
   readonly renumberIncrement: number
   readonly renumberStartLine: number
   readonly formatterKeywordCase: FormatKeywordCase
@@ -39,6 +40,7 @@ export const preferenceDefaults: IPreferenceValues = {
   labelIncrement: 2,
   labelModeEnabled: true,
   labelStartLine: 10,
+  larkenLkdosEnabled: false,
   renumberIncrement: 10,
   renumberStartLine: 10,
   formatterKeywordCase: 'upper',
@@ -81,6 +83,7 @@ export function loadPreferences(): IPreferenceValues {
     labelIncrement: readIntegerPreference(storedPreferences.labelIncrement, preferenceDefaults.labelIncrement, 1, 1000),
     labelModeEnabled: readBooleanPreference(storedPreferences.labelModeEnabled, preferenceDefaults.labelModeEnabled),
     labelStartLine: readIntegerPreference(storedPreferences.labelStartLine, preferenceDefaults.labelStartLine, 0, 9999),
+    larkenLkdosEnabled: readBooleanPreference(storedPreferences.larkenLkdosEnabled, preferenceDefaults.larkenLkdosEnabled),
     renumberIncrement: readIntegerPreference(storedPreferences.renumberIncrement, preferenceDefaults.renumberIncrement, 1, 1000),
     renumberStartLine: readIntegerPreference(storedPreferences.renumberStartLine, preferenceDefaults.renumberStartLine, 0, 9999),
     formatterKeywordCase: readFormatterKeywordCasePreference(storedPreferences.formatterKeywordCase, preferenceDefaults.formatterKeywordCase),

@@ -40,6 +40,7 @@ function App() {
     aercoFd68Enabled,
     automaticParsingEnabled,
     dialect,
+    larkenLkdosEnabled,
     oligerSafeEnabled,
     labelIncrement,
     labelModeEnabled,
@@ -50,6 +51,7 @@ function App() {
     setAercoFd68Enabled,
     setAutomaticParsingEnabled,
     setDialect,
+    setLarkenLkdosEnabled,
     setOligerSafeEnabled,
     setSpectranetEnabled,
     setLabelIncrement,
@@ -90,10 +92,11 @@ function App() {
       const selected: BasicExtension[] = []
       if (oligerSafeEnabled) selected.push('oliger-safe')
       if (aercoFd68Enabled) selected.push('aerco-fd68')
+      if (larkenLkdosEnabled) selected.push('larken-lkdos')
       return selected
     }
     return []
-  }, [aercoFd68Enabled, dialect, oligerSafeEnabled, spectranetEnabled])
+  }, [aercoFd68Enabled, dialect, larkenLkdosEnabled, oligerSafeEnabled, spectranetEnabled])
   const sourceDiagnostic = useMemo(() => (source === parsedSource ? parseStateToSourceDiagnostic(parseState) : null), [parseState, parsedSource, source])
   const diagnosticsVisible = showResults && parseState.ok
   const programFilesRef = useRef<ProgramFilesState | null>(null)
@@ -407,6 +410,14 @@ function App() {
     clearNavigation()
   }
 
+  function handleLarkenLkdosEnabledChange(nextEnabled: boolean): void {
+    if (automaticParsingEnabled) {
+      startParserProcessing()
+    }
+    setLarkenLkdosEnabled(nextEnabled)
+    clearNavigation()
+  }
+
   function commitSource(nextSource: string, options: SourceCommitOptions = {}): void {
     const {
       clearNavigationAfterCommit = false,
@@ -519,6 +530,7 @@ function App() {
                   labelIncrement={labelIncrement}
                   labelModeEnabled={labelModeEnabled}
                   labelStartLine={labelStartLine}
+                  larkenLkdosEnabled={larkenLkdosEnabled}
                   optionsSectionCollapsed={optionsSectionCollapsed}
                   renumberIncrement={renumberIncrement}
                   renumberStartLine={renumberStartLine}
@@ -535,6 +547,7 @@ function App() {
                   onLabelIncrementChange={handleLabelIncrementChange}
                   onLabelModeEnabledChange={handleLabelModeEnabledChange}
                   onLabelStartLineChange={handleLabelStartLineChange}
+                  onLarkenLkdosEnabledChange={handleLarkenLkdosEnabledChange}
                   onOptionsSectionCollapsedChange={setOptionsSectionCollapsed}
                   onRenumberIncrementChange={setRenumberIncrement}
                   onRenumberStartLineChange={setRenumberStartLine}

@@ -1,7 +1,7 @@
 import type { TokenKind } from './tokens'
 
 export type BasicDialect = 'spectrum' | 'ts2068' | 'zx81'
-export type BasicExtension = 'spectranet' | 'oliger-safe' | 'aerco-fd68'
+export type BasicExtension = 'spectranet' | 'oliger-safe' | 'aerco-fd68' | 'larken-lkdos'
 
 export const defaultDialect: BasicDialect = 'spectrum'
 
@@ -11,6 +11,10 @@ export const ts2068OnlyKeywordKinds = new Set<TokenKind>([...ts2068OnlyStatement
 
 export const zx81OnlyStatementKinds = new Set<TokenKind>(['UNPLOT', 'SCROLL', 'FAST', 'SLOW'])
 export const aercoFd68StatementKinds = new Set<TokenKind>(['CAT', 'FORMAT', 'MOVE', 'ERASE'])
+export const larkenLkdosStatementKinds = new Set<TokenKind>([
+  'SAVE', 'LOAD', 'MERGE', 'CAT', 'ERASE', 'GOTO', 'PRINT', 'LPRINT', 'NEW', 'MOVE', 'VERIFY', 'DATA', 'FORMAT',
+  'OPEN', 'CLOSE', 'INPUT', 'CLEAR', 'DRAW', 'CIRCLE', 'INK', 'PAPER', 'POKE',
+])
 export const oligerSafeSlashStatementKinds = new Set<TokenKind>([
   'SAVE',
   'OUT',
@@ -79,6 +83,10 @@ export function isOligerSafeEnabled(dialect: BasicDialect, extensions: readonly 
 
 export function isAercoFd68Enabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
   return dialect === 'ts2068' && isBasicExtensionEnabled(extensions, 'aerco-fd68')
+}
+
+export function isLarkenLkdosEnabled(dialect: BasicDialect, extensions: readonly BasicExtension[] | undefined): boolean {
+  return dialect === 'ts2068' && isBasicExtensionEnabled(extensions, 'larken-lkdos')
 }
 
 export function dialectLabel(dialect: BasicDialect): string {

@@ -20,6 +20,7 @@ import type {
   InputItemNode,
   InputStatementNode,
   LetStatementNode,
+  LarkenLkdosStatementNode,
   LineNode,
   NextStatementNode,
   NumberLiteralNode,
@@ -50,9 +51,11 @@ import {
   defaultDialect,
   dialectLabel,
   isAercoFd68Enabled,
+  isLarkenLkdosEnabled,
   isOligerSafeEnabled,
   isSpectranetEnabled,
   isSpectrumFamilyDialect,
+  larkenLkdosStatementKinds,
   oligerSafeSlashStatementKinds,
   spectranetStatementKinds,
   ts2068OnlyExpressionKeywordKinds,
@@ -108,6 +111,10 @@ const aercoFd68Extensions = new Set<AercoFd68Extension>(['BAS', 'DAT', 'CHR', 'B
 const aercoFd68ExtensionDisplayList = '.BAS, .DAT, .CHR, .BIN, .SCR, .ARO, .LRO, .BUT, or .VAR'
 const aercoFd68CatNoParameterExtensions = new Set<AercoFd68Extension>(['SCR', 'ARO', 'LRO', 'VAR'])
 const aercoFd68MoveNoParameterExtensions = new Set<AercoFd68Extension>(['SCR', 'ARO', 'BUT', 'VAR'])
+const larkenLkdosOpenDevices = new Set(['W0', 'W1', 'W2', 'LP', 'DD'])
+const larkenLkdosInputOperandNames = ['window', 'top', 'left', 'right', 'bottom'] as const
+const larkenLkdosInputSignature = 'window, top, left, right, bottom'
+type LarkenLkdosFileTypePrefix = 'A' | 'B' | 'C'
 const attributeControls = new Set<TokenKind>(['PAPER', 'INK', 'BRIGHT', 'FLASH', 'INVERSE', 'OVER'])
 const binaryOperators = new Set<TokenKind>([
   'EXPON',
@@ -424,6 +431,7 @@ export class Parser {
 
   private parseStatementSequence(stopKinds: ReadonlySet<TokenKind>): StatementNode[] {
     const statements: StatementNode[] = []
+    let larkenDispatch: LarkenLkdosStatementNode['dispatch'] | null = null
 
     while (!this.atAny(stopKinds) && !this.at('EOF')) {
       if (this.dialect === 'zx81' && this.at('ENDOFSTAT')) {
@@ -431,6 +439,7 @@ export class Parser {
       }
 
       if (this.match('ENDOFSTAT')) {
+        larkenDispatch = null
         statements.push({ type: 'EmptyStatement', span: this.previous().span })
         continue
       }
@@ -449,7 +458,11 @@ export class Parser {
         throw this.error(`${tokenKindDisplayName(this.current().kind)} is not supported by the ${this.dialectLabel()} dialect.`, 'statement')
       }
 
-      statements.push(this.parseStatement())
+      const statement = larkenDispatch && larkenLkdosStatementKinds.has(this.current().kind)
+        ? this.parseLarkenLkdos(larkenDispatch)
+        : this.parseStatement()
+      larkenDispatch = null
+      statements.push(statement)
       this.consumeRawDisplayControlSequences()
 
       if (this.dialect === 'zx81' && this.at('ENDOFSTAT')) {
@@ -458,6 +471,7 @@ export class Parser {
 
       if (this.at('ENDOFSTAT')) {
         this.advance()
+        larkenDispatch = this.larkenDispatchFor(statement)
         if (this.atAny(stopKinds) || this.at('EOF')) {
           statements.push({ type: 'EmptyStatement', span: this.previous().span })
         }
@@ -1271,6 +1285,359 @@ export class Parser {
       items,
       span: spanThroughChildren(command.span, items),
     }
+  }
+
+  private parseLarkenLkdos(dispatch: LarkenLkdosStatementNode['dispatch']): LarkenLkdosStatementNode {
+    const command = this.current()
+    let statement: Exclude<StatementNode, LarkenLkdosStatementNode>
+
+    switch (command.kind) {
+      case 'SAVE':
+      case 'LOAD':
+        statement = this.parseTape()
+        break
+      case 'MERGE':
+      case 'GOTO':
+      case 'CLOSE':
+      case 'CLEAR':
+      case 'INK':
+      case 'PAPER':
+        statement = this.parseExpressionCommand(false)
+        break
+      case 'POKE':
+      case 'OPEN':
+        statement = this.parseBinaryExpressionCommand()
+        break
+      case 'PRINT':
+      case 'LPRINT':
+        statement = this.parseLarkenFilePrint()
+        break
+      case 'INPUT':
+        statement = this.parseLarkenInput()
+        break
+      case 'DRAW':
+      case 'CIRCLE':
+        statement = this.parsePlot()
+        if (statement.operands.length !== 3) {
+          throw this.error(`Larken LKDOS ${command.kind} requires exactly three numeric operands.`, 'three numeric expressions')
+        }
+        break
+      case 'DATA':
+        statement = this.parseData()
+        break
+      case 'CAT':
+      case 'ERASE':
+      case 'MOVE':
+        statement = this.parseLarkenStorage()
+        break
+      case 'NEW':
+      case 'VERIFY':
+      case 'FORMAT': {
+        const bare = this.advance()
+        statement = { type: 'BareCommandStatement', command: bare.kind, span: bare.span }
+        break
+      }
+      default:
+        throw this.error(`Unsupported Larken LKDOS command ${this.describeCurrent()}.`, 'LKDOS command')
+    }
+
+    if (!this.atStatementBoundary()) {
+      throw this.error(`Expected ":" or end of line after Larken LKDOS ${command.kind} but found ${this.describeCurrent()}.`, ['ENDOFSTAT', 'ENDOFLINE'])
+    }
+
+    this.validateLarkenStatement(statement)
+    return {
+      type: 'LarkenLkdosStatement',
+      dispatch,
+      command: command.kind,
+      statement,
+      span: statement.span,
+    }
+  }
+
+  private parseLarkenFilePrint(): PrintStatementNode {
+    const command = this.advance()
+    const expression = this.parseExpression()
+    this.expectExpressionType(expression, 'string')
+    return {
+      type: 'PrintStatement',
+      command: command.kind === 'LPRINT' ? 'LPRINT' : 'PRINT',
+      items: [{ type: 'PrintExpression', expression, span: expression.span }],
+      span: joinSpans(command.span, expression.span),
+    }
+  }
+
+  private parseLarkenInput(): InputStatementNode {
+    const command = this.expect('INPUT')
+    if (!this.match('STREAM')) {
+      throw this.error(
+        `Larken LKDOS INPUT requires "#" followed by five numeric operands (${larkenLkdosInputSignature}).`,
+        ['STREAM'],
+      )
+    }
+    const stream = this.previous()
+    const values: ExpressionNode[] = []
+    const separators: Token[] = []
+
+    for (const [index, operandName] of larkenLkdosInputOperandNames.entries()) {
+      if (index > 0) {
+        if (this.atStatementBoundary()) this.throwLarkenInputMissingOperand(operandName)
+        if (!this.match('COMMA')) {
+          throw this.error(`Larken LKDOS INPUT # expected "," before ${operandName}.`, ['COMMA'])
+        }
+        separators.push(this.previous())
+      }
+
+      if (this.atStatementBoundary()) this.throwLarkenInputMissingOperand(operandName)
+      const operandToken = this.current()
+      const value = this.parseExpression()
+      if (this.expressionValueType(value) !== 'numeric') {
+        throw new ZxBasicSyntaxError(`Larken LKDOS INPUT # ${operandName} operand must be numeric.`, operandToken, 'numeric expression')
+      }
+      values.push(value)
+    }
+
+    if (!this.atStatementBoundary()) {
+      throw this.error(
+        `Larken LKDOS INPUT # accepts exactly five numeric operands (${larkenLkdosInputSignature}); found extra input after bottom.`,
+        ['ENDOFSTAT', 'ENDOFLINE'],
+      )
+    }
+
+    const control: PrintControlNode = {
+      type: 'StreamControl',
+      value: values[0],
+      span: joinSpans(stream.span, values[0].span),
+    }
+    const items: InputItemNode[] = [{ type: 'InputControl', control, span: control.span }]
+    for (const [index, value] of values.slice(1).entries()) {
+      const separator = separators[index]
+      items.push({ type: 'InputSeparator', separator: separator.kind, span: separator.span })
+      items.push({ type: 'InputExpression', expression: value, span: value.span })
+    }
+    return { type: 'InputStatement', items, span: joinSpans(command.span, values[4].span) }
+  }
+
+  private throwLarkenInputMissingOperand(operandName: typeof larkenLkdosInputOperandNames[number]): never {
+    throw this.error(
+      `Larken LKDOS INPUT # requires five numeric operands (${larkenLkdosInputSignature}); missing ${operandName}.`,
+      'numeric expression',
+    )
+  }
+
+  private parseLarkenStorage(): StorageStatementNode {
+    const command = this.advance()
+    const items: StorageItemNode[] = []
+    if (command.kind === 'CAT' || command.kind === 'ERASE') {
+      items.push(this.parseStorageExpression('string'))
+      const separator = this.expect('COMMA')
+      items.push({ type: 'StorageSeparator', separator: separator.kind, span: separator.span })
+    } else {
+      items.push(this.parseStorageExpression('string'))
+      const separator = this.expect('COMMA')
+      items.push({ type: 'StorageSeparator', separator: separator.kind, span: separator.span })
+      items.push(this.parseStorageExpression('string'))
+    }
+    return {
+      type: 'StorageStatement',
+      command: command.kind as 'CAT' | 'ERASE' | 'MOVE',
+      items,
+      span: spanThroughChildren(command.span, items),
+    }
+  }
+
+  private validateLarkenStatement(statement: Exclude<StatementNode, LarkenLkdosStatementNode>): void {
+    if (statement.type === 'TapeStatement') {
+      const expectedPrefix = statement.extra?.type === 'DataFileSpec'
+        ? 'A'
+        : statement.extra?.type === 'CodeFileSpec' || statement.extra?.type === 'ScreenFileSpec'
+          ? 'C'
+          : 'B'
+      this.validateLarkenTypedDiskFilename(statement.fileExpression, statement.command, expectedPrefix)
+    }
+    if (statement.type === 'ExpressionCommandStatement' && statement.expression) {
+      const ranges: Partial<Record<TokenKind, readonly [number, number]>> = {
+        GOTO: [0, 4], CLOSE: [2, 15], CLEAR: [0, 2], INK: [0, 7], PAPER: [0, 7],
+      }
+      const range = ranges[statement.command]
+      if (range) this.expectLarkenLiteralRange(statement.expression, range[0], range[1], statement.command)
+      if (statement.command === 'MERGE') {
+        this.validateLarkenTypedDiskFilename(statement.expression, statement.command, 'B')
+      }
+    }
+    if (statement.type === 'BinaryCommandStatement') {
+      if (statement.command === 'OPEN') {
+        this.expectLarkenLiteralRange(statement.left, 2, 15, 'OPEN # stream')
+        this.validateLarkenOpenTarget(statement.right)
+      } else if (statement.command === 'POKE') {
+        this.expectLarkenLiteralRange(statement.left, 0, 65535, 'POKE address')
+        this.expectLarkenLiteralRange(statement.right, 0, 65535, 'POKE value')
+      }
+    }
+    if (statement.type === 'InputStatement') {
+      this.validateLarkenInputGeometry(statement)
+    }
+    if (statement.type === 'PlotStatement' && (statement.command === 'DRAW' || statement.command === 'CIRCLE')) {
+      this.expectLarkenLiteralRange(statement.operands[0], 0, 255, `${statement.command} ${statement.command === 'DRAW' ? 'width' : 'x'}`)
+      this.expectLarkenLiteralRange(statement.operands[1], 0, statement.command === 'DRAW' ? 255 : 174, `${statement.command} ${statement.command === 'DRAW' ? 'height' : 'y'}`)
+      this.expectLarkenLiteralRange(statement.operands[2], 0, 10, `${statement.command} pattern`)
+    }
+    if (statement.type === 'PrintStatement') {
+      const item = statement.items[0]
+      if (item?.type === 'PrintExpression') {
+        this.validateLarkenDiskFilename(item.expression, statement.command)
+      }
+    }
+    if (statement.type === 'StorageStatement' && statement.command !== 'CAT') {
+      const expressions = statement.items.flatMap((item) => item.type === 'StorageExpression' ? [item.expression] : [])
+      for (const [index, expression] of expressions.entries()) {
+        const label = statement.command === 'MOVE'
+          ? `MOVE ${index === 0 ? 'source' : 'destination'}`
+          : statement.command
+        this.validateLarkenDiskFilename(expression, label)
+      }
+    }
+  }
+
+  private validateLarkenInputGeometry(statement: InputStatementNode): void {
+    const values: ExpressionNode[] = []
+    for (const item of statement.items) {
+      if (item.type === 'InputControl' && item.control.type === 'StreamControl') {
+        values.push(item.control.value)
+      } else if (item.type === 'InputExpression') {
+        values.push(item.expression)
+      }
+    }
+    const [window, top, left, right, bottom] = values
+    if (!window || !top || !left || !right || !bottom) return
+
+    this.expectLarkenLiteralRange(window, 0, 2, 'INPUT # window')
+    this.expectLarkenLiteralRange(top, 0, 20, 'INPUT # top')
+    this.expectLarkenLiteralRange(left, 0, 29, 'INPUT # left')
+    this.expectLarkenLiteralRange(right, 1, 31, 'INPUT # right')
+    this.expectLarkenLiteralRange(bottom, 1, 21, 'INPUT # bottom')
+    this.expectLarkenLiteralOrdering(left, right, 'right', 'left')
+    this.expectLarkenLiteralOrdering(top, bottom, 'bottom', 'top')
+  }
+
+  private expectLarkenLiteralOrdering(
+    lowerExpression: ExpressionNode,
+    upperExpression: ExpressionNode,
+    upperName: string,
+    lowerName: string,
+  ): void {
+    const lower = this.numericLiteralValue(lowerExpression)
+    const upper = this.numericLiteralValue(upperExpression)
+    if (lower !== null && upper !== null && upper <= lower) {
+      throw new ZxBasicSyntaxError(
+        `Larken LKDOS INPUT # ${upperName} literal must be greater than ${lowerName}.`,
+        this.tokenForExpression(upperExpression),
+        `${upperName} > ${lowerName}`,
+      )
+    }
+  }
+
+  private validateLarkenTypedDiskFilename(
+    expression: ExpressionNode,
+    command: string,
+    expectedPrefix: LarkenLkdosFileTypePrefix,
+  ): void {
+    const actualPrefix = this.validateLarkenDiskFilename(expression, command)
+    if (actualPrefix === null || actualPrefix === expectedPrefix) return
+
+    const article = expectedPrefix === 'A' ? 'an' : 'a'
+    throw new ZxBasicSyntaxError(
+      `Larken LKDOS ${command} literal filename requires ${article} .${expectedPrefix}? extension for this file form.`,
+      this.tokenForExpression(expression),
+      `.${expectedPrefix}? filename`,
+    )
+  }
+
+  private validateLarkenDiskFilename(expression: ExpressionNode, command: string): LarkenLkdosFileTypePrefix | null {
+    const literal = this.larkenStringLiteralValue(expression)
+    if (literal === null) return null
+
+    const match = /^[^.]{1,6}\.([ABC]).$/.exec(literal)
+    if (!match || literal.endsWith('^')) {
+      throw new ZxBasicSyntaxError(
+        `Larken LKDOS ${command} literal filename must have a 1 to 6 character name, a period, and a two-character extension beginning with uppercase A, B, or C; "^" cannot be the final extension character.`,
+        this.tokenForExpression(expression),
+        'LKDOS filename',
+      )
+    }
+    return match[1] as LarkenLkdosFileTypePrefix
+  }
+
+  private validateLarkenOpenTarget(expression: ExpressionNode): void {
+    const literal = this.larkenStringLiteralValue(expression)
+    if (literal === null) return
+
+    const normalized = literal.toUpperCase()
+    if (larkenLkdosOpenDevices.has(normalized) || /^\S+ (?:IN|OUT)$/.test(normalized)) return
+
+    throw new ZxBasicSyntaxError(
+      'Larken LKDOS OPEN # literal must be w0, w1, w2, lp, dd, or a filename followed by exactly one space and IN or OUT.',
+      this.tokenForExpression(expression),
+      'LKDOS device or "filename IN|OUT"',
+    )
+  }
+
+  private larkenStringLiteralValue(expression: ExpressionNode): string | null {
+    if (expression.type === 'StringLiteral' && expression.indexes.length === 0) return expression.value
+    if (expression.type === 'GroupedExpression' && expression.indexes.length === 0) {
+      return this.larkenStringLiteralValue(expression.expression)
+    }
+    return null
+  }
+
+  private expectLarkenLiteralRange(expression: ExpressionNode, minimum: number, maximum: number, label: string): void {
+    const value = this.numericLiteralValue(expression)
+    if (value !== null && (value < minimum || value > maximum)) {
+      throw new ZxBasicSyntaxError(
+        `Larken LKDOS ${label} literal must be from ${minimum} to ${maximum}.`,
+        this.tokenForExpression(expression),
+        `${minimum}..${maximum}`,
+      )
+    }
+  }
+
+  private tokenForExpression(expression: ExpressionNode): Token {
+    const startToken = this.tokens.find((token) => token.span.start.offset === expression.span.start.offset)
+    return { ...(startToken ?? this.current()), span: expression.span }
+  }
+
+  private numericLiteralValue(expression: ExpressionNode): number | null {
+    if (expression.type === 'NumberLiteral') return expression.value
+    if (expression.type === 'GroupedExpression') return this.numericLiteralValue(expression.expression)
+    if (expression.type === 'UnaryExpression') {
+      const operand = this.numericLiteralValue(expression.operand)
+      if (operand === null) return null
+      return expression.operator === 'MINUS' ? -operand : operand
+    }
+    return null
+  }
+
+  private larkenDispatchFor(statement: StatementNode): LarkenLkdosStatementNode['dispatch'] | null {
+    if (!isLarkenLkdosEnabled(this.dialect, this.extensions)) return null
+    if (statement.type === 'ExpressionCommandStatement'
+      && statement.command === 'RANDOMIZE'
+      && statement.expression?.type === 'SystemFunctionCall'
+      && statement.expression.functionName === 'USR'
+      && statement.expression.args.length === 1
+      && statement.expression.args[0].type === 'NumberLiteral'
+      && statement.expression.args[0].value === 100) {
+      return 'usr-100'
+    }
+    if (statement.type === 'PrintStatement'
+      && statement.command === 'PRINT'
+      && statement.items.length === 1
+      && statement.items[0].type === 'PrintControl'
+      && statement.items[0].control.type === 'StreamControl'
+      && statement.items[0].control.value.type === 'NumberLiteral'
+      && statement.items[0].control.value.value === 4) {
+      return 'stream-4'
+    }
+    return null
   }
 
   private tryParseCompleteTs2068Storage(): StorageStatementNode | null {

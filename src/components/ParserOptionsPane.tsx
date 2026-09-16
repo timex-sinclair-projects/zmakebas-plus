@@ -48,6 +48,7 @@ type ParserOptionsPaneProps = {
   readonly labelIncrement: number
   readonly labelModeEnabled: boolean
   readonly labelStartLine: number
+  readonly larkenLkdosEnabled: boolean
   readonly optionsSectionCollapsed: OptionsPaneSectionCollapsedStates
   readonly renumberIncrement: number
   readonly renumberStartLine: number
@@ -64,6 +65,7 @@ type ParserOptionsPaneProps = {
   readonly onLabelIncrementChange: (increment: number) => void
   readonly onLabelModeEnabledChange: (enabled: boolean) => void
   readonly onLabelStartLineChange: (line: number) => void
+  readonly onLarkenLkdosEnabledChange: (enabled: boolean) => void
   readonly onOptionsSectionCollapsedChange: (collapsedStates: OptionsPaneSectionCollapsedStates) => void
   readonly onRenumberIncrementChange: (increment: number) => void
   readonly onRenumberStartLineChange: (line: number) => void
@@ -85,6 +87,7 @@ export function ParserOptionsPane({
   labelIncrement,
   labelModeEnabled,
   labelStartLine,
+  larkenLkdosEnabled,
   optionsSectionCollapsed,
   renumberIncrement,
   renumberStartLine,
@@ -101,6 +104,7 @@ export function ParserOptionsPane({
   onLabelIncrementChange,
   onLabelModeEnabledChange,
   onLabelStartLineChange,
+  onLarkenLkdosEnabledChange,
   onOptionsSectionCollapsedChange,
   onRenumberIncrementChange,
   onRenumberStartLineChange,
@@ -167,6 +171,15 @@ export function ParserOptionsPane({
             checked={dialect === 'ts2068' && aercoFd68Enabled}
             disabled={dialect !== 'ts2068'}
             onChange={(event) => onAercoFd68EnabledChange(event.currentTarget.checked)}
+          />
+          <Form.Check
+            className="option-check"
+            type="checkbox"
+            id="larken-lkdos-enabled"
+            label="Larken Disk"
+            checked={dialect === 'ts2068' && larkenLkdosEnabled}
+            disabled={dialect !== 'ts2068'}
+            onChange={(event) => onLarkenLkdosEnabledChange(event.currentTarget.checked)}
           />
         </CollapsibleOptionGroup>
 
